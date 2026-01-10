@@ -1,791 +1,513 @@
-// ========================================
-// 汎用ゲームサーバー - Universal Game Platform
-// どんなマルチプレイゲームでも対応
-// ========================================
+/**
+ * Universal Game Server v2 with Room Listing
+ * Supports multiple game types with public/private rooms
+ */
 
 const express = require('express');
-const { WebSocketServer } = require('ws');
-const http = require('http');
-const crypto = require('crypto');
+const WebSocket = require('ws');
 
 const app = express();
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
+const PORT = process.env.PORT || 8080;
 
-// ========================================
-// データ構造
-// ========================================
-
-// ゲームルーム管理
-class GameRoom {
-  constructor(roomId, gameType, maxPlayers = 4) {
-    this.roomId = roomId;
-    this.gameType = gameType; // 'air-hockey', 'card-game', 'rpg', etc.
-    this.maxPlayers = maxPlayers;
-    this.players = new Map(); // playerId -> { ws, playerNumber, name, data }
-    this.gameState = {}; // ゲーム固有の状態
-    this.isStarted = false;
-    this.createdAt = new Date();
-    this.lastActivity = new Date();
-    this.metadata = {}; // ゲーム固有のメタデータ
-  }
-
-  addPlayer(ws, playerId, playerName = null) {
-    if (this.players.size >= this.maxPlayers) {
-      return { success: false, error: 'Room is full' };
-    }
-
-    const playerNumber = this.players.size + 1;
-    
-    this.players.set(playerId, {
-      ws: ws,
-      playerNumber: playerNumber,
-      name: playerName || `Player ${playerNumber}`,
-      data: {},
-      joinedAt: new Date()
-    });
-
-    this.lastActivity = new Date();
-
-    // プレイヤーに情報を通知
-    this.send(ws, {
-      type: 'playerAssigned',
-      playerId: playerId,
-      playerNumber: playerNumber,
-      roomId: this.roomId,
-      gameType: this.gameType
-    });
-
-    // 全員にルーム状態を通知
-    this.broadcast({
-      type: 'roomUpdate',
-      roomId: this.roomId,
-      players: Array.from(this.players.values()).map(p => ({
-        playerNumber: p.playerNumber,
-        name: p.name,
-        data: p.data
-      })),
-      playersCount: this.players.size,
-      maxPlayers: this.maxPlayers,
-      isStarted: this.isStarted,
-      canStart: this.players.size >= 2
-    });
-
-    console.log(`✅ Player ${playerId} joined room ${this.roomId} (${this.players.size}/${this.maxPlayers})`);
-
-    return { success: true, playerNumber: playerNumber };
-  }
-
-  removePlayer(playerId) {
-    const player = this.players.get(playerId);
-    if (!player) return;
-
-    this.players.delete(playerId);
-    this.lastActivity = new Date();
-
-    // 残りのプレイヤーに通知
-    this.broadcast({
-      type: 'playerLeft',
-      playerId: playerId,
-      playersCount: this.players.size
-    });
-
-    console.log(`❌ Player ${playerId} left room ${this.roomId}`);
-
-    // ゲーム中に誰かが抜けたらゲームをリセット
-    if (this.isStarted && this.players.size < 2) {
-      this.isStarted = false;
-      this.broadcast({
-        type: 'gameAborted',
-        reason: 'Not enough players'
-      });
-    }
-  }
-
-  handleMessage(playerId, data) {
-    const player = this.players.get(playerId);
-    if (!player) return;
-
-    this.lastActivity = new Date();
-
-    switch (data.type) {
-      case 'startGame':
-        this.startGame(playerId);
-        break;
-
-      case 'gameAction':
-        this.handleGameAction(playerId, data.action);
-        break;
-
-      case 'updateState':
-        this.updateGameState(playerId, data.state);
-        break;
-
-      case 'chat':
-        this.handleChat(playerId, data.message);
-        break;
-
-      case 'updatePlayerData':
-        this.updatePlayerData(playerId, data.data);
-        break;
-
-      default:
-        // ゲーム固有のメッセージをそのままブロードキャスト
-        this.broadcast({
-          ...data,
-          fromPlayer: playerId
-        }, playerId);
-    }
-  }
-
-  startGame(initiatorId) {
-    if (this.players.size < 2) {
-      this.send(this.players.get(initiatorId).ws, {
-        type: 'error',
-        message: 'Need at least 2 players to start'
-      });
-      return;
-    }
-
-    if (this.isStarted) {
-      return;
-    }
-
-    this.isStarted = true;
-    this.gameState = this.initializeGameState();
-
-    this.broadcast({
-      type: 'gameStart',
-      roomId: this.roomId,
-      gameType: this.gameType,
-      players: Array.from(this.players.values()).map(p => ({
-        playerNumber: p.playerNumber,
-        name: p.name,
-        data: p.data
-      })),
-      initialState: this.gameState
-    });
-
-    console.log(`🎮 Game started in room ${this.roomId} (${this.gameType})`);
-  }
-
-  initializeGameState() {
-    // ゲームタイプに応じた初期状態
-    switch (this.gameType) {
-      case 'air-hockey':
-        return {
-          puck: { x: 400, y: 300, vx: 0, vy: 0 },
-          scores: Array(this.players.size).fill(0)
-        };
-      
-      case 'card-game':
-        return {
-          deck: this.shuffleDeck(),
-          hands: {},
-          currentTurn: 1
-        };
-      
-      default:
-        return {};
-    }
-  }
-
-  shuffleDeck() {
-    // カードゲーム用のデッキシャッフル
-    const deck = [];
-    const suits = ['♠', '♥', '♦', '♣'];
-    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-    
-    for (const suit of suits) {
-      for (const rank of ranks) {
-        deck.push({ suit, rank });
-      }
-    }
-    
-    // Fisher-Yates シャッフル
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    
-    return deck;
-  }
-
-  handleGameAction(playerId, action) {
-    // ゲーム固有のアクション処理
-    this.broadcast({
-      type: 'gameAction',
-      playerId: playerId,
-      action: action,
-      timestamp: Date.now()
-    }, playerId);
-  }
-
-  updateGameState(playerId, stateUpdate) {
-    // 状態更新をマージ
-    this.gameState = {
-      ...this.gameState,
-      ...stateUpdate
-    };
-
-    // 他のプレイヤーに同期
-    this.broadcast({
-      type: 'stateSync',
-      state: this.gameState,
-      updatedBy: playerId
-    }, playerId);
-  }
-
-  handleChat(playerId, message) {
-    const player = this.players.get(playerId);
-    if (!player) return;
-
-    this.broadcast({
-      type: 'chat',
-      playerId: playerId,
-      playerName: player.name,
-      message: message,
-      timestamp: Date.now()
-    });
-  }
-
-  updatePlayerData(playerId, data) {
-    const player = this.players.get(playerId);
-    if (!player) return;
-
-    player.data = { ...player.data, ...data };
-
-    // 全員に更新を通知
-    this.broadcast({
-      type: 'playerDataUpdate',
-      playerId: playerId,
-      data: player.data
-    });
-  }
-
-  broadcast(message, excludePlayerId = null) {
-    const messageStr = JSON.stringify(message);
-    
-    for (const [playerId, player] of this.players) {
-      if (playerId !== excludePlayerId && player.ws.readyState === 1) {
-        try {
-          player.ws.send(messageStr);
-        } catch (e) {
-          console.error(`Failed to send to ${playerId}:`, e);
-        }
-      }
-    }
-  }
-
-  send(ws, message) {
-    if (ws.readyState === 1) {
-      try {
-        ws.send(JSON.stringify(message));
-      } catch (e) {
-        console.error('Failed to send message:', e);
-      }
-    }
-  }
-
-  isEmpty() {
-    return this.players.size === 0;
-  }
-
-  isInactive(timeoutMs = 30 * 60 * 1000) {
-    // 30分間アクティビティがない場合は非アクティブ
-    return Date.now() - this.lastActivity.getTime() > timeoutMs;
-  }
-
-  toJSON() {
-    return {
-      roomId: this.roomId,
-      gameType: this.gameType,
-      maxPlayers: this.maxPlayers,
-      playersCount: this.players.size,
-      isStarted: this.isStarted,
-      createdAt: this.createdAt,
-      lastActivity: this.lastActivity,
-      players: Array.from(this.players.values()).map(p => ({
-        playerNumber: p.playerNumber,
-        name: p.name
-      }))
-    };
-  }
-}
-
-// ========================================
-// グローバル管理
-// ========================================
-
-const rooms = new Map(); // roomId -> GameRoom
-const htmlStorage = new Map(); // id -> { html, uploadedAt, size }
-
-// 定期的に非アクティブなルームを削除
-setInterval(() => {
-  for (const [roomId, room] of rooms) {
-    if (room.isEmpty() || room.isInactive()) {
-      rooms.delete(roomId);
-      console.log(`🗑️ Removed inactive room: ${roomId}`);
-    }
-  }
-}, 5 * 60 * 1000); // 5分ごと
-
-// ========================================
-// ユーティリティ
-// ========================================
-
-function generateId(length = 8) {
-  return crypto.randomBytes(length).toString('hex').substring(0, length);
-}
-
-function generateRoomId() {
-  let roomId;
-  do {
-    roomId = generateId(6).toUpperCase();
-  } while (rooms.has(roomId));
-  return roomId;
-}
-
-// ========================================
-// REST API
-// ========================================
-
+// Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ limit: '50mb' }));
 
 // CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
 
-// HTMLアップロード
-app.post('/upload/:id', (req, res) => {
-  const id = req.params.id;
-  const html = req.body;
-  
-  if (!html || typeof html !== 'string') {
-    return res.status(400).json({ error: 'Invalid HTML content' });
+// ============================================
+// Game Rooms Storage
+// ============================================
+
+const rooms = new Map();
+
+class GameRoom {
+  constructor(roomId, gameType = 'default', maxPlayers = 2) {
+    this.roomId = roomId;
+    this.gameType = gameType;
+    this.maxPlayers = maxPlayers;
+    this.players = new Map();
+    this.gameState = {};
+    this.isStarted = false;
+    this.createdAt = Date.now();
+    this.lastActivity = Date.now();
+    
+    // NEW: Room listing features
+    this.isPublic = true;
+    this.hostName = '';
+    this.roomName = '';
   }
   
-  htmlStorage.set(id, {
-    html: html,
-    uploadedAt: new Date(),
-    size: html.length
-  });
-  
-  console.log(`📤 HTML uploaded: ${id} (${html.length} bytes)`);
-  
-  res.json({
-    success: true,
-    id: id,
-    size: html.length,
-    downloadUrl: `${req.protocol}://${req.get('host')}/download/${id}`,
-    gameUrl: `${req.protocol}://${req.get('host')}/game/${id}`
-  });
-});
-
-// HTMLダウンロード
-app.get('/download/:id', (req, res) => {
-  const id = req.params.id;
-  const data = htmlStorage.get(id);
-  
-  if (!data) {
-    return res.status(404).json({ error: 'HTML not found' });
+  addPlayer(ws, playerId, playerName = '') {
+    if (this.players.size >= this.maxPlayers) {
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: 'Room is full'
+      }));
+      return null;
+    }
+    
+    const playerNumber = this.players.size + 1;
+    
+    this.players.set(playerId, {
+      ws,
+      playerNumber,
+      playerName: playerName || `Player ${playerNumber}`,
+      joinedAt: Date.now()
+    });
+    
+    // First player is host
+    if (playerNumber === 1) {
+      this.hostName = playerName || `Player 1`;
+    }
+    
+    this.lastActivity = Date.now();
+    
+    console.log(`✅ Player ${playerId} (${playerName}) joined room ${this.roomId}`);
+    
+    // Send player assignment
+    ws.send(JSON.stringify({
+      type: 'playerAssigned',
+      playerId,
+      playerNumber,
+      roomId: this.roomId,
+      gameType: this.gameType
+    }));
+    
+    // Broadcast room update
+    this.broadcastRoomUpdate();
+    
+    // Broadcast room list update to all clients
+    broadcastRoomList();
+    
+    // Auto-start if room is full
+    if (this.players.size === this.maxPlayers && !this.isStarted) {
+      setTimeout(() => this.startGame(), 500);
+    }
+    
+    return playerNumber;
   }
   
-  console.log(`📥 HTML downloaded: ${id}`);
-  
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(data.html);
-});
-
-// ゲーム起動ページ
-app.get('/game/:id', (req, res) => {
-  const id = req.params.id;
-  const data = htmlStorage.get(id);
-  
-  if (!data) {
-    return res.status(404).send('Game not found');
+  removePlayer(playerId) {
+    this.players.delete(playerId);
+    console.log(`❌ Player ${playerId} left room ${this.roomId}`);
+    
+    // Broadcast player left
+    this.broadcast({
+      type: 'playerLeft',
+      playerId
+    });
+    
+    this.broadcastRoomUpdate();
+    broadcastRoomList();
+    
+    // Abort game if started
+    if (this.isStarted && this.players.size < 2) {
+      this.isStarted = false;
+      this.broadcast({
+        type: 'gameAborted',
+        reason: 'Player disconnected'
+      });
+    }
+    
+    // Return true if room is empty (should be deleted)
+    return this.players.size === 0;
   }
   
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send(data.html);
-});
-
-// ルーム作成 API
-app.post('/api/rooms/create', (req, res) => {
-  const { gameType, maxPlayers, roomId } = req.body;
-  
-  const id = roomId || generateRoomId();
-  
-  if (rooms.has(id)) {
-    return res.status(400).json({ error: 'Room already exists' });
+  startGame() {
+    if (this.isStarted) return;
+    
+    this.isStarted = true;
+    this.lastActivity = Date.now();
+    
+    console.log(`🎮 Game started in room ${this.roomId}`);
+    
+    this.broadcast({
+      type: 'gameStart',
+      players: Array.from(this.players.entries()).map(([id, p]) => ({
+        playerId: id,
+        playerNumber: p.playerNumber,
+        playerName: p.playerName
+      }))
+    });
+    
+    broadcastRoomList();
   }
   
-  const room = new GameRoom(id, gameType || 'generic', maxPlayers || 4);
-  rooms.set(id, room);
+  broadcastRoomUpdate() {
+    const playersList = Array.from(this.players.entries()).map(([id, p]) => ({
+      playerId: id,
+      playerNumber: p.playerNumber,
+      playerName: p.playerName
+    }));
+    
+    this.broadcast({
+      type: 'roomUpdate',
+      roomId: this.roomId,
+      players: playersList,
+      playersCount: this.players.size,
+      maxPlayers: this.maxPlayers,
+      isStarted: this.isStarted,
+      canStart: this.players.size >= 2
+    });
+  }
   
-  console.log(`🎮 Room created: ${id} (${gameType})`);
+  broadcast(message, excludePlayerId = null) {
+    this.players.forEach((player, playerId) => {
+      if (playerId !== excludePlayerId && player.ws.readyState === WebSocket.OPEN) {
+        player.ws.send(JSON.stringify(message));
+      }
+    });
+  }
   
-  res.json({
-    success: true,
-    roomId: id,
-    gameType: room.gameType,
-    maxPlayers: room.maxPlayers,
-    websocketUrl: `wss://${req.get('host')}?room=${id}`
-  });
-});
+  handleMessage(playerId, data) {
+    this.lastActivity = Date.now();
+    const player = this.players.get(playerId);
+    if (!player) return;
+    
+    // Handle different message types
+    if (data.type === 'startGame') {
+      this.startGame();
+    } 
+    else if (data.type === 'gameAction') {
+      // Relay game actions to other players
+      this.broadcast(data, playerId);
+    }
+    else if (data.type === 'paddleMove' || data.type === 'puckSync' || data.type === 'score') {
+      // Air hockey specific messages
+      this.broadcast(data, playerId);
+    }
+    else {
+      // Generic message relay
+      this.broadcast(data, playerId);
+    }
+  }
+}
 
-// ルーム一覧
+// ============================================
+// REST API - Room Listing
+// ============================================
+
+// Get room list
 app.get('/api/rooms', (req, res) => {
   const gameType = req.query.gameType;
   
-  let roomList = Array.from(rooms.values());
+  const publicRooms = Array.from(rooms.values())
+    .filter(room => room.isPublic)
+    .filter(room => !gameType || room.gameType === gameType)
+    .map(room => ({
+      roomId: room.roomId,
+      gameType: room.gameType,
+      roomName: room.roomName || room.roomId,
+      hostName: room.hostName,
+      players: room.players.size,
+      maxPlayers: room.maxPlayers,
+      status: room.isStarted ? 'playing' : 'waiting',
+      createdAt: room.createdAt
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt); // Newest first
   
-  if (gameType) {
-    roomList = roomList.filter(r => r.gameType === gameType);
-  }
+  res.json({ rooms: publicRooms });
+});
+
+// Stats API
+app.get('/api/stats', (req, res) => {
+  let totalPlayers = 0;
+  let gamesInProgress = 0;
+  
+  rooms.forEach(room => {
+    totalPlayers += room.players.size;
+    if (room.isStarted) gamesInProgress++;
+  });
   
   res.json({
-    total: roomList.length,
-    rooms: roomList.map(r => r.toJSON())
+    rooms: rooms.size,
+    players: totalPlayers,
+    games: gamesInProgress
   });
 });
 
-// ルーム詳細
-app.get('/api/rooms/:roomId', (req, res) => {
-  const room = rooms.get(req.params.roomId);
-  
-  if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
-  }
-  
-  res.json(room.toJSON());
+// ============================================
+// WebSocket Server
+// ============================================
+
+const server = app.listen(PORT, () => {
+  console.log(`🚀 Universal Game Server v2 running on port ${PORT}`);
 });
 
-// ルーム削除
-app.delete('/api/rooms/:roomId', (req, res) => {
-  const roomId = req.params.roomId;
-  
-  if (rooms.delete(roomId)) {
-    console.log(`🗑️ Room deleted: ${roomId}`);
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: 'Room not found' });
-  }
-});
+const wss = new WebSocket.Server({ server });
 
-// 統計情報
-app.get('/api/stats', (req, res) => {
-  const stats = {
-    totalRooms: rooms.size,
-    totalPlayers: Array.from(rooms.values()).reduce((sum, r) => sum + r.players.size, 0),
-    gamesInProgress: Array.from(rooms.values()).filter(r => r.isStarted).length,
-    gameTypes: {}
-  };
+// Broadcast room list to all connected clients
+function broadcastRoomList() {
+  const publicRooms = Array.from(rooms.values())
+    .filter(room => room.isPublic)
+    .map(room => ({
+      roomId: room.roomId,
+      gameType: room.gameType,
+      roomName: room.roomName || room.roomId,
+      hostName: room.hostName,
+      players: room.players.size,
+      maxPlayers: room.maxPlayers,
+      status: room.isStarted ? 'playing' : 'waiting'
+    }));
   
-  for (const room of rooms.values()) {
-    if (!stats.gameTypes[room.gameType]) {
-      stats.gameTypes[room.gameType] = 0;
+  const message = JSON.stringify({
+    type: 'roomListUpdate',
+    rooms: publicRooms
+  });
+  
+  // Send to all connected clients
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(message);
     }
-    stats.gameTypes[room.gameType]++;
-  }
-  
-  res.json(stats);
-});
-
-// ホームページ
-app.get('/', (req, res) => {
-  res.send(`
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>🎮 Universal Game Platform</title>
-<style>
-body {
-  font-family: -apple-system, sans-serif;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 40px 20px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
+  });
 }
-.container {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 40px;
-  border-radius: 16px;
-  backdrop-filter: blur(10px);
-}
-h1 {
-  font-size: 48px;
-  margin-bottom: 10px;
-  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-.subtitle {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.8);
-  margin-bottom: 40px;
-}
-.feature-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-  margin: 30px 0;
-}
-.feature-card {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 24px;
-  border-radius: 12px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-}
-.feature-card h3 {
-  font-size: 24px;
-  margin-bottom: 12px;
-}
-.stats {
-  display: flex;
-  gap: 20px;
-  margin: 30px 0;
-  flex-wrap: wrap;
-}
-.stat-box {
-  background: rgba(255, 255, 255, 0.15);
-  padding: 20px 30px;
-  border-radius: 12px;
-  text-align: center;
-  flex: 1;
-  min-width: 150px;
-}
-.stat-number {
-  font-size: 36px;
-  font-weight: bold;
-  color: #00ff88;
-}
-.stat-label {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 8px;
-}
-button {
-  background: linear-gradient(135deg, #00ff88, #00d4ff);
-  color: #000;
-  border: none;
-  padding: 14px 28px;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: bold;
-  cursor: pointer;
-  margin: 10px 5px;
-}
-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 255, 136, 0.4);
-}
-code {
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #00ff88;
-}
-.section {
-  margin: 40px 0;
-  padding: 30px;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-}
-</style>
-</head>
-<body>
-<div class="container">
-  <h1>🎮 Universal Game Platform</h1>
-  <p class="subtitle">どんなマルチプレイゲームでも簡単に作れる統合プラットフォーム</p>
-  
-  <div class="stats" id="stats">
-    <div class="stat-box">
-      <div class="stat-number" id="totalRooms">-</div>
-      <div class="stat-label">アクティブルーム</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-number" id="totalPlayers">-</div>
-      <div class="stat-label">オンラインプレイヤー</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-number" id="gamesInProgress">-</div>
-      <div class="stat-label">進行中のゲーム</div>
-    </div>
-  </div>
-  
-  <div class="feature-grid">
-    <div class="feature-card">
-      <h3>🚀 簡単デプロイ</h3>
-      <p>HTMLをアップロードするだけで即座にマルチプレイゲームが動作</p>
-    </div>
-    <div class="feature-card">
-      <h3>🌐 リアルタイム通信</h3>
-      <p>WebSocketで低遅延の双方向通信を実現</p>
-    </div>
-    <div class="feature-card">
-      <h3>🎯 汎用性</h3>
-      <p>あらゆるジャンルのゲームに対応可能な柔軟な設計</p>
-    </div>
-    <div class="feature-card">
-      <h3>📊 ルーム管理</h3>
-      <p>自動ルーム作成、プレイヤー管理、状態同期</p>
-    </div>
-  </div>
-  
-  <div class="section">
-    <h2>📚 API ドキュメント</h2>
-    
-    <h3>1. HTMLアップロード</h3>
-    <code>POST /upload/:id</code>
-    <p>ゲームのHTMLをアップロード</p>
-    
-    <h3>2. ルーム作成</h3>
-    <code>POST /api/rooms/create</code>
-    <p>新しいゲームルームを作成</p>
-    
-    <h3>3. WebSocket接続</h3>
-    <code>wss://your-server.com?room=ROOM_ID</code>
-    <p>ゲームルームに接続</p>
-    
-    <h3>4. ルーム一覧</h3>
-    <code>GET /api/rooms</code>
-    <p>アクティブなルーム一覧を取得</p>
-  </div>
-  
-  <div class="section">
-    <h2>🎮 対応ゲームタイプ</h2>
-    <ul style="line-height: 2;">
-      <li>🏒 アクションゲーム（エアホッケー、シューティング等）</li>
-      <li>🃏 カードゲーム（トランプ、TCG等）</li>
-      <li>🎲 ボードゲーム（オセロ、チェス等）</li>
-      <li>🎯 パズルゲーム（協力パズル等）</li>
-      <li>🏎️ レースゲーム</li>
-      <li>⚔️ 対戦格闘ゲーム</li>
-      <li>🗺️ MMORPG</li>
-      <li>...その他あらゆるジャンル</li>
-    </ul>
-  </div>
-  
-  <div style="text-align: center; margin-top: 40px;">
-    <button onclick="location.href='/docs'">📖 詳細ドキュメント</button>
-    <button onclick="location.href='/api/rooms'">🎮 ルーム一覧</button>
-  </div>
-</div>
-
-<script>
-async function loadStats() {
-  try {
-    const response = await fetch('/api/stats');
-    const stats = await response.json();
-    
-    document.getElementById('totalRooms').textContent = stats.totalRooms;
-    document.getElementById('totalPlayers').textContent = stats.totalPlayers;
-    document.getElementById('gamesInProgress').textContent = stats.gamesInProgress;
-  } catch (e) {
-    console.error('Failed to load stats:', e);
-  }
-}
-
-loadStats();
-setInterval(loadStats, 5000);
-</script>
-</body>
-</html>
-  `);
-});
-
-// ========================================
-// WebSocket
-// ========================================
 
 wss.on('connection', (ws, req) => {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  const roomId = url.searchParams.get('room');
-  const playerId = generateId();
+  const url = new URL(req.url, `ws://${req.headers.host}`);
+  const roomParam = url.searchParams.get('room');
   
-  if (!roomId) {
-    ws.send(JSON.stringify({ type: 'error', message: 'Room ID required' }));
-    ws.close();
-    return;
-  }
+  console.log(`🔌 New connection (room param: ${roomParam})`);
   
-  console.log(`🔌 Connection: ${playerId} -> room ${roomId}`);
+  let currentRoom = null;
+  let currentPlayerId = null;
   
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
+      console.log(`📩 Received:`, data.type, data);
       
-      // ルーム参加リクエスト
+      // Handle join message
       if (data.type === 'join') {
-        let room = rooms.get(roomId);
+        const { roomId, playerId, playerName, gameType, isPublic, roomName } = data;
+        currentPlayerId = playerId;
         
-        // ルームが存在しない場合は作成
-        if (!room) {
-          room = new GameRoom(
-            roomId,
-            data.gameType || 'generic',
-            data.maxPlayers || 4
+        // Create room if doesn't exist
+        if (!rooms.has(roomId)) {
+          const room = new GameRoom(
+            roomId, 
+            gameType || 'default',
+            data.maxPlayers || 2
           );
+          room.isPublic = isPublic !== false; // Default true
+          room.roomName = roomName || roomId;
           rooms.set(roomId, room);
-          console.log(`🎮 Auto-created room: ${roomId}`);
+          console.log(`🆕 Room created: ${roomId} (${gameType})`);
         }
         
-        const result = room.addPlayer(ws, playerId, data.playerName);
-        
-        if (!result.success) {
-          ws.send(JSON.stringify({ type: 'error', message: result.error }));
-          ws.close();
-        }
-        
-        return;
+        currentRoom = rooms.get(roomId);
+        currentRoom.addPlayer(ws, playerId, playerName);
+      }
+      // Handle other messages
+      else if (currentRoom) {
+        currentRoom.handleMessage(currentPlayerId, data);
       }
       
-      // その他のメッセージはルームに転送
-      const room = rooms.get(roomId);
-      if (room) {
-        room.handleMessage(playerId, data);
-      }
-      
-    } catch (e) {
-      console.error('WebSocket message error:', e);
+    } catch (err) {
+      console.error('❌ Message error:', err);
+      ws.send(JSON.stringify({
+        type: 'error',
+        message: err.message
+      }));
     }
   });
   
   ws.on('close', () => {
-    const room = rooms.get(roomId);
-    if (room) {
-      room.removePlayer(playerId);
-      
-      // ルームが空になったら削除
-      if (room.isEmpty()) {
-        rooms.delete(roomId);
-        console.log(`🗑️ Room ${roomId} deleted (empty)`);
+    console.log('👋 Connection closed');
+    if (currentRoom && currentPlayerId) {
+      const isEmpty = currentRoom.removePlayer(currentPlayerId);
+      if (isEmpty) {
+        rooms.delete(currentRoom.roomId);
+        console.log(`🗑️ Room deleted: ${currentRoom.roomId}`);
+        broadcastRoomList();
       }
     }
   });
   
-  ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+  ws.on('error', (err) => {
+    console.error('❌ WebSocket error:', err);
   });
 });
 
-// ========================================
-// サーバー起動
-// ========================================
+// Cleanup old rooms (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  const TIMEOUT = 30 * 60 * 1000; // 30 minutes
+  
+  rooms.forEach((room, roomId) => {
+    if (now - room.lastActivity > TIMEOUT && room.players.size === 0) {
+      rooms.delete(roomId);
+      console.log(`🗑️ Room ${roomId} cleaned up (inactive)`);
+    }
+  });
+}, 5 * 60 * 1000);
 
-const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`🚀 Universal Game Platform running on port ${PORT}`);
-  console.log(`📤 Upload: POST /upload/:id`);
-  console.log(`🎮 Create Room: POST /api/rooms/create`);
-  console.log(`🌐 WebSocket: wss://localhost:${PORT}?room=ROOM_ID`);
-  console.log(`📊 Stats: GET /api/stats`);
+// Home page
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Universal Game Server v2</title>
+      <style>
+        body { 
+          font-family: 'Segoe UI', Arial; 
+          background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+          color: #fff; 
+          padding: 40px;
+          margin: 0;
+        }
+        h1 { color: #00f3ff; text-shadow: 0 0 10px rgba(0,243,255,0.5); }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .stats { display: flex; gap: 20px; margin: 30px 0; }
+        .stat { 
+          flex: 1; 
+          background: rgba(0,0,0,0.3); 
+          padding: 30px; 
+          border-radius: 12px;
+          text-align: center;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+        .stat-value { 
+          font-size: 56px; 
+          font-weight: bold; 
+          color: #00f3ff; 
+          text-shadow: 0 0 20px rgba(0,243,255,0.6);
+        }
+        .stat-label { 
+          font-size: 14px; 
+          color: #aaa; 
+          margin-top: 10px;
+        }
+        .section {
+          background: rgba(0,0,0,0.3);
+          padding: 30px;
+          margin: 20px 0;
+          border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.1);
+        }
+        .section h2 { color: #00f3ff; margin-top: 0; }
+        code { 
+          background: rgba(0,0,0,0.5); 
+          padding: 4px 8px; 
+          border-radius: 4px;
+          color: #0ff;
+        }
+        .rooms-list {
+          margin-top: 20px;
+        }
+        .room-item {
+          background: rgba(0,243,255,0.05);
+          padding: 15px;
+          margin: 10px 0;
+          border-radius: 8px;
+          border-left: 3px solid #00f3ff;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <h1>🎮 Universal Game Server v2</h1>
+        <p>Multi-game support with room listing</p>
+        
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="rooms">0</div>
+            <div class="stat-label">Active Rooms</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="players">0</div>
+            <div class="stat-label">Online Players</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="games">0</div>
+            <div class="stat-label">Games in Progress</div>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h2>📋 Public Rooms</h2>
+          <div id="rooms-list" class="rooms-list">
+            <p style="color: #888;">No public rooms available</p>
+          </div>
+        </div>
+        
+        <div class="section">
+          <h2>🔌 API Endpoints</h2>
+          <p><strong>WebSocket:</strong> <code>wss://YOUR-SERVER.com?room=ROOM_ID</code></p>
+          <p><strong>Room List:</strong> <code>GET /api/rooms</code></p>
+          <p><strong>Filter by game:</strong> <code>GET /api/rooms?gameType=air-hockey</code></p>
+          <p><strong>Stats:</strong> <code>GET /api/stats</code></p>
+        </div>
+        
+        <div class="section">
+          <h2>📝 Supported Games</h2>
+          <ul>
+            <li>🏒 Air Hockey</li>
+            <li>🃏 Memory Game (coming soon)</li>
+            <li>⚫ Reversi (coming soon)</li>
+            <li>🎮 Your game here!</li>
+          </ul>
+        </div>
+      </div>
+      
+      <script>
+        function updateStats() {
+          fetch('/api/stats')
+            .then(r => r.json())
+            .then(data => {
+              document.getElementById('rooms').textContent = data.rooms;
+              document.getElementById('players').textContent = data.players;
+              document.getElementById('games').textContent = data.games;
+            });
+        }
+        
+        function updateRoomList() {
+          fetch('/api/rooms')
+            .then(r => r.json())
+            .then(data => {
+              const container = document.getElementById('rooms-list');
+              if (data.rooms.length === 0) {
+                container.innerHTML = '<p style="color: #888;">No public rooms available</p>';
+              } else {
+                container.innerHTML = data.rooms.map(room => \`
+                  <div class="room-item">
+                    <strong>\${room.roomName}</strong> 
+                    <span style="color: #00f3ff;">(\${room.gameType})</span>
+                    <br>
+                    <small style="color: #aaa;">
+                      Host: \${room.hostName} | 
+                      Players: \${room.players}/\${room.maxPlayers} | 
+                      Status: \${room.status}
+                    </small>
+                  </div>
+                \`).join('');
+              }
+            });
+        }
+        
+        updateStats();
+        updateRoomList();
+        setInterval(updateStats, 2000);
+        setInterval(updateRoomList, 3000);
+      </script>
+    </body>
+    </html>
+  `);
 });
+
+console.log(`
+╔════════════════════════════════════════╗
+║  🎮 UNIVERSAL GAME SERVER V2 READY   ║
+║  📋 Room Listing: Enabled             ║
+║  🔄 Auto-refresh: Enabled             ║
+╚════════════════════════════════════════╝
+`);
