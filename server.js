@@ -672,6 +672,57 @@ app.get('/api/stats', (req, res) => {
 });
 
 // ============================================
+// HTML Code Storage API
+// ============================================
+
+const codes = new Map();
+
+// コードを保存
+app.post('/api/code/save', express.text({limit: '10mb'}), (req, res) => {
+    const id = Math.random().toString(36).substr(2, 9);
+    codes.set(id, req.body);
+    
+    const url = `${req.protocol}://${req.get('host')}/api/code/${id}`;
+    
+    console.log(`💾 Code saved with ID: ${id}`);
+    
+    res.json({ 
+        id, 
+        url,
+        length: req.body.length
+    });
+});
+
+// コードを取得（プレーンテキストで返す）
+app.get('/api/code/:id', (req, res) => {
+    const code = codes.get(req.params.id);
+    
+    if (!code) {
+        return res.status(404).send('Code not found');
+    }
+    
+    console.log(`📤 Code retrieved: ${req.params.id}`);
+    
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.send(code);
+});
+
+// コード一覧を取得（デバッグ用）
+app.get('/api/codes', (req, res) => {
+    const codeList = Array.from(codes.entries()).map(([id, code]) => ({
+        id,
+        length: code.length,
+        preview: code.substring(0, 100) + '...'
+    }));
+    
+    res.json({ 
+        count: codes.size,
+        codes: codeList 
+    });
+});
+
+// ============================================
 // WebSocket Server
 // ============================================
 
