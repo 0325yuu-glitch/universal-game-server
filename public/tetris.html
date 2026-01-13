@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Gravity Cyber Tetris v8</title>
+    <title>Gravity Cyber Tetris Final v9</title>
     <style>
         :root {
             --bg-color: #050510;
@@ -70,6 +70,20 @@
             font-size: 16px; font-weight: bold; border-radius: 20px; margin-top: 15px;
         }
 
+        /* SOUND TOGGLE (Right Side) */
+        #sound-toggle {
+            position: absolute; top: -40px; right: 20px;
+            height: 30px; padding: 0 15px;
+            background: rgba(0,0,0,0.6); border: 1px solid #666;
+            color: #aaa; font-size: 11px; font-weight: bold;
+            border-radius: 15px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; user-select: none;
+        }
+        #sound-toggle.on { 
+            background: var(--neon-blue); color: #000; border-color: var(--neon-blue); 
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.6);
+        }
+
         /* CONTROLS */
         #controls {
             flex: 0 0 220px;
@@ -99,26 +113,11 @@
         }
         #btn-rot:active { background: rgba(255,0,85,0.5); transform: scale(0.95); }
 
-        /* BUTTONS ABOVE CONTROLS */
         #btn-hold-touch {
             position: absolute; top: -40px; left: 20px;
             width: 70px; height: 30px; background: #ffaa00; color: #000;
             font-weight: bold; border-radius: 15px; display: flex; justify-content: center; align-items: center;
             box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
-        }
-
-        /* SOUND TOGGLE (Moved to Right Side above controls) */
-        #sound-toggle {
-            position: absolute; top: -40px; right: 20px;
-            height: 30px; padding: 0 15px;
-            background: rgba(0,0,0,0.6); border: 1px solid #666;
-            color: #aaa; font-size: 11px; font-weight: bold;
-            border-radius: 15px; display: flex; justify-content: center; align-items: center;
-            cursor: pointer; user-select: none;
-        }
-        #sound-toggle.on { 
-            background: var(--neon-blue); color: #000; border-color: var(--neon-blue); 
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.6);
         }
     </style>
 </head>
@@ -147,7 +146,6 @@
 
         <div id="controls">
             <div id="btn-hold-touch">HOLD</div>
-            
             <div id="sound-toggle">🔇 SOUND OFF</div>
 
             <div class="d-pad">
@@ -179,15 +177,17 @@ const PIECES = [
     [[[0, 0, 0, 0],[7, 7, 7, 7],[0, 0, 0, 0],[0, 0, 0, 0]], 7] // I
 ];
 
-// --- SOUND MANAGER ---
+// --- SOUND MANAGER (Path Fixed) ---
 const Sound = {
     bgm: null,
+    // ★修正ポイント: /static/assets/tetris/ から始まる絶対パスに変更
+    // これならHTMLファイルがどこにあっても必ずファイルが見つかります
     files: {
-        rotate: './assets/rotate.mp3',
-        drop: './assets/drop.mp3',
-        clear: './assets/clear.mp3',
-        gameover: './assets/gameover.mp3',
-        bgm: './assets/bgm.mp3'
+        rotate: '/static/assets/tetris/rotate.mp3',
+        drop: '/static/assets/tetris/drop.mp3',
+        clear: '/static/assets/tetris/clear.mp3',
+        gameover: '/static/assets/tetris/gameover.mp3',
+        bgm: '/static/assets/tetris/bgm.mp3'
     },
     enabled: false,
     
@@ -204,7 +204,9 @@ const Sound = {
         if (name !== 'bgm') {
             const se = new Audio(src);
             se.volume = 0.8;
-            se.play().catch(e => {});
+            se.play().catch(e => {
+                // 自動再生制限などはコンソールに出るがプレイには影響なし
+            });
         }
     },
 
@@ -214,7 +216,9 @@ const Sound = {
         if (this.enabled) {
             btn.textContent = "🔊 SOUND ON";
             btn.classList.add('on');
-            this.bgm.play().catch(e => {});
+            this.bgm.play().catch(e => {
+                console.log("Play blocked:", e);
+            });
         } else {
             btn.textContent = "🔇 SOUND OFF";
             btn.classList.remove('on');
