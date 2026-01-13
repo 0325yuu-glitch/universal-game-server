@@ -1,7 +1,7 @@
 <html lang="ja"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大富豪オンライン Final Plus V9</title>
+    <title>大富豪オンライン Final Plus V9 (Fixed)</title>
     <style>
         :root {
             --card-w: 72px; 
@@ -15,7 +15,6 @@
             margin: 0;
             padding: 0;
             background-color: var(--bg-color);
-            /* 背景画像を以前の落ち着いたデザインに戻しました */
             background-image: url('https://gdp-nlp-chat.cdn.sfmji.com/synclub-nlp-chat/gemini_image_generate_b19af552-e9af-483b-9e9a-a1a1d78bbae3_2026-01-12-19:40:01_74aa6e9f-9f77-4f62-a97d-3d8de91d36c8_2.png');
             background-size: cover;
             background-position: center;
@@ -225,7 +224,6 @@
         </div>
     </div>
 
-    <!-- 名前入力ダイアログ -->
     <div class="name-dialog" id="nameDialog">
         <div class="name-dialog-box">
             <h3>名前を入力</h3>
@@ -237,7 +235,6 @@
         </div>
     </div>
 
-    <!-- Lobby Screen -->
     <div class="lobby-screen" id="lobbyScreen" style="display:none;">
         <div class="lobby-header">
             <div class="lobby-title">オンラインロビー</div>
@@ -256,7 +253,6 @@
         </div>
     </div>
 
-    <!-- Waiting Room -->
     <div class="waiting-screen" id="waitingScreen" style="display:none;">
         <div class="waiting-box">
             <div class="waiting-title">参加待ち中...</div>
@@ -485,11 +481,12 @@
         ws.send(JSON.stringify({type:'startGame'}));
     }
     
+    // -------------------------------------------------------------------
+    // 【修正】 オンラインゲーム開始時の手札処理
+    // サーバーからのカードには v (強さ) が含まれていない場合があるので補完する
+    // -------------------------------------------------------------------
     function startOnlineGameReceived(data){
         console.log('🔍 RAW:', JSON.stringify(data));
-        console.log('📊 hand:', data.hand);
-        console.log('👥 names:', data.playerNames);
-        console.log('🎯 starter:', data.starter);
         
         try {
             gameMode='online';
@@ -497,14 +494,20 @@
             playerNames=data.playerNames||[];
             totalPlayers=playerNames.length;
             
-            console.log('✓ Basic OK');
-            
-            const myHand=(data.hand||[]).map(c=>({
-                s:c.s,r:c.r,v:c.v,isJ:c.isJ||false,
-                id:Math.random().toString(36),sel:false
-            }));
-            
-            console.log('✓ Hand OK, cards:', myHand.length);
+            // 修正箇所: 手札の v (value) を RANKS から計算してセット
+            const myHand=(data.hand||[]).map(c => {
+                let val = RANKS.indexOf(c.r); // '3'=0, '2'=12
+                if(c.r === 'JK' || c.isJ) val = 99;
+                
+                return {
+                    s: c.s,
+                    r: c.r,
+                    v: val, // 強さを付与
+                    isJ: c.isJ || c.r === 'JK',
+                    id: Math.random().toString(36),
+                    sel: false
+                };
+            });
             
             const cardsPerPlayer=Math.floor(54/totalPlayers);
             players=[];
@@ -517,39 +520,23 @@
                 }
             }
 
-            console.log('Step 7: init vars');
             finished=[];disqualified=[];field=[];passCnt=0;isRev=false;
             turn=data.starter;isProcessing=false;
-            console.log('✓ OK');
 
-            console.log('Step 8: sortHand');
             sortHand(players[myPlayerNumber]);
-            console.log('✓ OK');
 
-            console.log('Step 9: showGame');
             showGame();
-            console.log('✓ OK');
-
-            console.log('Step 10: setupOpp');
             setupOpponentAreas();
-            console.log('✓ OK');
-
-            console.log('Step 11: updateUI');
             updateUI();
-            console.log('✓ OK');
-
-            console.log('Step 12: updateRev');
             updateRevUI();
-            console.log('✓ OK');
 
-            console.log('Step 13: turn');
             if(turn===myPlayerNumber){
                 document.getElementById('myTurnLbl').style.opacity=1;
                 renderControls();
             }else{
                 document.getElementById('myTurnLbl').style.opacity=0;
             }
-            console.log('✅ DONE!');
+            console.log('✅ Online game started');
             
         } catch(e) {
             console.error('❌',e.message);
@@ -563,7 +550,45 @@
     function getPlayerIndexFromUI(uiIdx){if(totalPlayers===2){return uiIdx===2?(myPlayerNumber+1)%2:-1;}else if(totalPlayers===3){if(uiIdx===1)return(myPlayerNumber+1)%3;if(uiIdx===3)return(myPlayerNumber+2)%3;return -1;}else{if(uiIdx===1)return(myPlayerNumber+1)%4;if(uiIdx===2)return(myPlayerNumber+2)%4;if(uiIdx===3)return(myPlayerNumber+3)%4;return -1;}}
 
     function handleTurnStart(data){turn=data.currentPlayer;isProcessing=false;if(turn===myPlayerNumber){document.getElementById('myTurnLbl').style.opacity=1;renderControls();}else{document.getElementById('myTurnLbl').style.opacity=0;document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true;}}
-    function handleCardsPlayed(data){field.push({cards:data.cards,owner:data.player});passCnt=0;renderField();if(gameMode==='online'&&data.player!==myPlayerNumber){opponentHandCounts[data.player]=data.remainingCards;for(let uiIdx=1;uiIdx<=3;uiIdx++){const lbl=document.getElementById(`lbl${uiIdx}`);if(lbl&&lbl.style.display!=='none'){const playerIdx=getPlayerIndexFromUI(uiIdx);if(playerIdx===data.player){updateOpponentLabel(uiIdx,playerIdx);renderOppHand(playerIdx);}}}}if(data.revolution){isRev=!isRev;msg(isRev?"革命！":"革命返し");updateRevUI();sortHand(players[myPlayerNumber]);renderHand0();}if(data.eightCut)msg("8切り");if(data.spade3Return)msg("スペ3返し");}
+    
+    // -------------------------------------------------------------------
+    // 【修正】 他プレイヤーがカードを出した時の処理
+    // ここでも v (強さ) を補完して場に出すことで、isValidの比較が正常に動くようにする
+    // -------------------------------------------------------------------
+    function handleCardsPlayed(data){
+        // 修正箇所: 出されたカードに強さを付与
+        const playedCards = data.cards.map(c => {
+            let val = RANKS.indexOf(c.r);
+            if(c.r === 'JK' || c.isJ) val = 99;
+            return {
+                s: c.s,
+                r: c.r,
+                v: val,
+                isJ: c.isJ || c.r === 'JK'
+            };
+        });
+
+        field.push({cards: playedCards, owner: data.player});
+        passCnt=0;
+        renderField();
+
+        if(gameMode==='online'&&data.player!==myPlayerNumber){
+            opponentHandCounts[data.player]=data.remainingCards;
+            for(let uiIdx=1;uiIdx<=3;uiIdx++){
+                const lbl=document.getElementById(`lbl${uiIdx}`);
+                if(lbl&&lbl.style.display!=='none'){
+                    const playerIdx=getPlayerIndexFromUI(uiIdx);
+                    if(playerIdx===data.player){
+                        updateOpponentLabel(uiIdx,playerIdx);
+                        renderOppHand(playerIdx);
+                    }
+                }
+            }
+        }
+        if(data.revolution){isRev=!isRev;msg(isRev?"革命！":"革命返し");updateRevUI();sortHand(players[myPlayerNumber]);renderHand0();}
+        if(data.eightCut)msg("8切り");
+        if(data.spade3Return)msg("スペ3返し");
+    }
 
     function handlePlayerPassed(data){msg(`${playerNames[data.player]} パス`);passCnt++;}
     function handleFieldCleared(data){field=[];passCnt=0;renderField();msg("場が流れました");}
@@ -658,6 +683,7 @@
         if(sel.length !== last.length) return false;
         if(last.length===1 && last[0].isJ && sel.length===1 && sel[0].s==='♠' && sel[0].r==='3') return true;
         
+        // ここでの比較に c.v が必須
         const myS = norm.length ? (isRev? 12-norm[0].v : norm[0].v) : 999;
         const laS = last.filter(c=>!c.isJ).length ? (isRev? 12-last.filter(c=>!c.isJ)[0].v : last.filter(c=>!c.isJ)[0].v) : 999;
         return myS > laS;
