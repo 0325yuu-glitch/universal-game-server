@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Gravity Cyber Tetris Final v9</title>
+    <title>Gravity Cyber Tetris v10</title>
     <style>
         :root {
             --bg-color: #050510;
@@ -70,18 +70,18 @@
             font-size: 16px; font-weight: bold; border-radius: 20px; margin-top: 15px;
         }
 
-        /* SOUND TOGGLE (Right Side) */
+        /* SOUND TOGGLE */
         #sound-toggle {
-            position: absolute; top: -40px; right: 20px;
-            height: 30px; padding: 0 15px;
-            background: rgba(0,0,0,0.6); border: 1px solid #666;
-            color: #aaa; font-size: 11px; font-weight: bold;
-            border-radius: 15px; display: flex; justify-content: center; align-items: center;
-            cursor: pointer; user-select: none;
+            position: absolute; top: -50px; right: 10px;
+            height: 36px; padding: 0 20px;
+            background: rgba(0,0,0,0.8); border: 1px solid #666;
+            color: #aaa; font-size: 12px; font-weight: bold;
+            border-radius: 18px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; user-select: none; z-index: 200;
         }
         #sound-toggle.on { 
             background: var(--neon-blue); color: #000; border-color: var(--neon-blue); 
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.6);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
         }
 
         /* CONTROLS */
@@ -114,9 +114,9 @@
         #btn-rot:active { background: rgba(255,0,85,0.5); transform: scale(0.95); }
 
         #btn-hold-touch {
-            position: absolute; top: -40px; left: 20px;
-            width: 70px; height: 30px; background: #ffaa00; color: #000;
-            font-weight: bold; border-radius: 15px; display: flex; justify-content: center; align-items: center;
+            position: absolute; top: -45px; left: 20px;
+            width: 80px; height: 36px; background: #ffaa00; color: #000;
+            font-weight: bold; border-radius: 18px; display: flex; justify-content: center; align-items: center;
             box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
         }
     </style>
@@ -161,7 +161,6 @@
     </div>
 
 <script>
-// --- CONSTANTS ---
 const COLS = 10;
 const ROWS = 20;
 let BLOCK_SIZE = 20;
@@ -177,17 +176,17 @@ const PIECES = [
     [[[0, 0, 0, 0],[7, 7, 7, 7],[0, 0, 0, 0],[0, 0, 0, 0]], 7] // I
 ];
 
-// --- SOUND MANAGER (Path Fixed) ---
+// --- SOUND MANAGER (Absolute Path Fix) ---
+const SERVER_URL = "https://universal-game-server.onrender.com"; // あなたのサーバーURL
+
 const Sound = {
     bgm: null,
-    // ★修正ポイント: /static/assets/tetris/ から始まる絶対パスに変更
-    // これならHTMLファイルがどこにあっても必ずファイルが見つかります
     files: {
-        rotate: '/static/assets/tetris/rotate.mp3',
-        drop: '/static/assets/tetris/drop.mp3',
-        clear: '/static/assets/tetris/clear.mp3',
-        gameover: '/static/assets/tetris/gameover.mp3',
-        bgm: '/static/assets/tetris/bgm.mp3'
+        rotate: SERVER_URL + '/static/assets/tetris/rotate.mp3',
+        drop:   SERVER_URL + '/static/assets/tetris/drop.mp3',
+        clear:  SERVER_URL + '/static/assets/tetris/clear.mp3',
+        gameover: SERVER_URL + '/static/assets/tetris/gameover.mp3',
+        bgm:    SERVER_URL + '/static/assets/tetris/bgm.mp3'
     },
     enabled: false,
     
@@ -195,17 +194,24 @@ const Sound = {
         this.bgm = new Audio(this.files.bgm);
         this.bgm.loop = true;
         this.bgm.volume = 0.4;
+        
+        // エラーハンドリング (デバッグ用)
+        this.bgm.onerror = () => {
+            console.error("BGM Load Error: " + this.bgm.src);
+        };
     },
 
     play(name) {
         if (!this.enabled) return;
         const src = this.files[name];
         if (!src) return;
+        
         if (name !== 'bgm') {
             const se = new Audio(src);
             se.volume = 0.8;
             se.play().catch(e => {
-                // 自動再生制限などはコンソールに出るがプレイには影響なし
+                // 自動再生ポリシーなどのエラーはコンソールへ
+                console.log("SE Play Error:", e);
             });
         }
     },
@@ -213,12 +219,19 @@ const Sound = {
     toggle() {
         this.enabled = !this.enabled;
         const btn = document.getElementById('sound-toggle');
+        
         if (this.enabled) {
             btn.textContent = "🔊 SOUND ON";
             btn.classList.add('on');
+            
+            // 再生テスト
             this.bgm.play().catch(e => {
-                console.log("Play blocked:", e);
+                alert("再生エラー: " + e.message + "\nURLを確認してください:\n" + this.files.bgm);
+                this.enabled = false;
+                btn.textContent = "🔇 ERROR";
+                btn.classList.remove('on');
             });
+            
         } else {
             btn.textContent = "🔇 SOUND OFF";
             btn.classList.remove('on');
