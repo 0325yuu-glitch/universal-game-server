@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Gravity Cyber Tetris Sound</title>
+    <title>Gravity Cyber Tetris v8</title>
     <style>
         :root {
             --bg-color: #050510;
@@ -70,16 +70,6 @@
             font-size: 16px; font-weight: bold; border-radius: 20px; margin-top: 15px;
         }
 
-        /* SOUND TOGGLE */
-        #sound-toggle {
-            position: absolute; top: 10px; left: 10px;
-            z-index: 200;
-            background: rgba(0,0,0,0.5); border: 1px solid #555;
-            color: #888; padding: 5px 10px; border-radius: 15px;
-            font-size: 12px; cursor: pointer;
-        }
-        #sound-toggle.on { color: var(--neon-blue); border-color: var(--neon-blue); }
-
         /* CONTROLS */
         #controls {
             flex: 0 0 220px;
@@ -109,16 +99,30 @@
         }
         #btn-rot:active { background: rgba(255,0,85,0.5); transform: scale(0.95); }
 
+        /* BUTTONS ABOVE CONTROLS */
         #btn-hold-touch {
             position: absolute; top: -40px; left: 20px;
             width: 70px; height: 30px; background: #ffaa00; color: #000;
             font-weight: bold; border-radius: 15px; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.4);
+        }
+
+        /* SOUND TOGGLE (Moved to Right Side above controls) */
+        #sound-toggle {
+            position: absolute; top: -40px; right: 20px;
+            height: 30px; padding: 0 15px;
+            background: rgba(0,0,0,0.6); border: 1px solid #666;
+            color: #aaa; font-size: 11px; font-weight: bold;
+            border-radius: 15px; display: flex; justify-content: center; align-items: center;
+            cursor: pointer; user-select: none;
+        }
+        #sound-toggle.on { 
+            background: var(--neon-blue); color: #000; border-color: var(--neon-blue); 
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.6);
         }
     </style>
 </head>
 <body>
-    <div id="sound-toggle">SOUND OFF</div>
-
     <div id="game-wrapper">
         <div id="main-area">
             <div class="side-col">
@@ -140,8 +144,12 @@
                 <div class="panel-box"><div class="label">NEXT</div><canvas id="next"></canvas></div>
             </div>
         </div>
+
         <div id="controls">
             <div id="btn-hold-touch">HOLD</div>
+            
+            <div id="sound-toggle">🔇 SOUND OFF</div>
+
             <div class="d-pad">
                 <div class="btn" id="btn-up"><svg viewBox="0 0 24 24"><path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/></svg></div>
                 <div class="btn" id="btn-left"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg></div>
@@ -175,31 +183,28 @@ const PIECES = [
 const Sound = {
     bgm: null,
     files: {
-        rotate: './assets/tetris/rotate.mp3',
-        drop: './assets/tetris/drop.mp3',
-        clear: './assets/tetris/clear.mp3',
-        gameover: './assets/tetris/gameover.mp3',
-        bgm: './assets/tetris/bgm.mp3'
+        rotate: './assets/rotate.mp3',
+        drop: './assets/drop.mp3',
+        clear: './assets/clear.mp3',
+        gameover: './assets/gameover.mp3',
+        bgm: './assets/bgm.mp3'
     },
     enabled: false,
     
     init() {
-        // BGM Init
         this.bgm = new Audio(this.files.bgm);
         this.bgm.loop = true;
-        this.bgm.volume = 0.5;
+        this.bgm.volume = 0.4;
     },
 
     play(name) {
         if (!this.enabled) return;
         const src = this.files[name];
         if (!src) return;
-
-        // SEは毎回new Audioして重ねて鳴らす（連打対応）
         if (name !== 'bgm') {
             const se = new Audio(src);
             se.volume = 0.8;
-            se.play().catch(() => {});
+            se.play().catch(e => {});
         }
     },
 
@@ -207,11 +212,11 @@ const Sound = {
         this.enabled = !this.enabled;
         const btn = document.getElementById('sound-toggle');
         if (this.enabled) {
-            btn.textContent = "SOUND ON";
+            btn.textContent = "🔊 SOUND ON";
             btn.classList.add('on');
-            this.bgm.play().catch(e => console.log("BGM play failed:", e));
+            this.bgm.play().catch(e => {});
         } else {
-            btn.textContent = "SOUND OFF";
+            btn.textContent = "🔇 SOUND OFF";
             btn.classList.remove('on');
             this.bgm.pause();
         }
@@ -234,7 +239,7 @@ const ctx = canvas.getContext('2d');
 const nextCtx = document.getElementById('next').getContext('2d');
 const holdCtx = document.getElementById('hold').getContext('2d');
 
-// --- MAIN INIT ---
+// --- INIT ---
 function init() {
     let availW = window.innerWidth - 180;
     let availH = window.innerHeight - 240;
@@ -280,7 +285,6 @@ function resetGame() {
     lastTime = performance.now();
     gameLoop(lastTime);
     
-    // BGM Restart if enabled
     if (Sound.enabled) {
         Sound.bgm.currentTime = 0;
         Sound.bgm.play().catch(()=>{});
@@ -322,7 +326,6 @@ function draw() {
         ghostPos.y--;
         ctx.globalAlpha = 0.2;
         drawMatrix(player.matrix, ghostPos, ctx, player.colorIdx);
-        
         ctx.globalAlpha = 1.0;
         drawMatrix(player.matrix, player.pos, ctx, player.colorIdx);
     }
@@ -465,7 +468,7 @@ function arenaSweep() {
         rows.push(y);
     }
     if (rows.length > 0) { 
-        clearingRows = rows; clearAnimStart = performance.now(); 
+        clearingRows = rows; clearAnimStart = performance.now();
         Sound.play('clear');
     }
 }
@@ -532,6 +535,7 @@ btnDown.addEventListener('mouseleave', stopSoftDrop);
 document.getElementById('restart-btn').addEventListener('click', resetGame);
 document.getElementById('restart-btn').addEventListener('touchstart', resetGame);
 
+// SOUND TOGGLE
 document.getElementById('sound-toggle').addEventListener('click', () => Sound.toggle());
 document.getElementById('sound-toggle').addEventListener('touchstart', (e) => {
     e.preventDefault(); Sound.toggle();
