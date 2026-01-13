@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Gravity Cyber Tetris Final</title>
+    <title>Gravity Cyber Tetris Sound</title>
     <style>
         :root {
             --bg-color: #050510;
@@ -19,7 +19,7 @@
                               linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
             background-size: 30px 30px;
             color: #fff;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             height: 100vh; width: 100vw;
             overflow: hidden; touch-action: none;
             display: flex; flex-direction: column;
@@ -41,6 +41,7 @@
             border: 2px solid var(--neon-blue);
             box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
             background: rgba(0, 0, 0, 0.9);
+            position: relative;
         }
         canvas#tetris { display: block; }
 
@@ -69,7 +70,17 @@
             font-size: 16px; font-weight: bold; border-radius: 20px; margin-top: 15px;
         }
 
-        /* コントローラー */
+        /* SOUND TOGGLE */
+        #sound-toggle {
+            position: absolute; top: 10px; left: 10px;
+            z-index: 200;
+            background: rgba(0,0,0,0.5); border: 1px solid #555;
+            color: #888; padding: 5px 10px; border-radius: 15px;
+            font-size: 12px; cursor: pointer;
+        }
+        #sound-toggle.on { color: var(--neon-blue); border-color: var(--neon-blue); }
+
+        /* CONTROLS */
         #controls {
             flex: 0 0 220px;
             background: linear-gradient(to top, rgba(0,0,0,0.95), transparent);
@@ -106,6 +117,8 @@
     </style>
 </head>
 <body>
+    <div id="sound-toggle">SOUND OFF</div>
+
     <div id="game-wrapper">
         <div id="main-area">
             <div class="side-col">
@@ -142,7 +155,7 @@
     </div>
 
 <script>
-// --- CONFIG & CONSTANTS ---
+// --- CONSTANTS ---
 const COLS = 10;
 const ROWS = 20;
 let BLOCK_SIZE = 20;
@@ -157,6 +170,53 @@ const PIECES = [
     [[[0, 0, 6],[6, 6, 6],[0, 0, 0]], 6], // L
     [[[0, 0, 0, 0],[7, 7, 7, 7],[0, 0, 0, 0],[0, 0, 0, 0]], 7] // I
 ];
+
+// --- SOUND MANAGER ---
+const Sound = {
+    bgm: null,
+    files: {
+        rotate: './assets/tetris/rotate.mp3',
+        drop: './assets/tetris/drop.mp3',
+        clear: './assets/tetris/clear.mp3',
+        gameover: './assets/tetris/gameover.mp3',
+        bgm: './assets/tetris/bgm.mp3'
+    },
+    enabled: false,
+    
+    init() {
+        // BGM Init
+        this.bgm = new Audio(this.files.bgm);
+        this.bgm.loop = true;
+        this.bgm.volume = 0.5;
+    },
+
+    play(name) {
+        if (!this.enabled) return;
+        const src = this.files[name];
+        if (!src) return;
+
+        // SEは毎回new Audioして重ねて鳴らす（連打対応）
+        if (name !== 'bgm') {
+            const se = new Audio(src);
+            se.volume = 0.8;
+            se.play().catch(() => {});
+        }
+    },
+
+    toggle() {
+        this.enabled = !this.enabled;
+        const btn = document.getElementById('sound-toggle');
+        if (this.enabled) {
+            btn.textContent = "SOUND ON";
+            btn.classList.add('on');
+            this.bgm.play().catch(e => console.log("BGM play failed:", e));
+        } else {
+            btn.textContent = "SOUND OFF";
+            btn.classList.remove('on');
+            this.bgm.pause();
+        }
+    }
+};
 
 // --- STATE ---
 let grid = [];
@@ -174,46 +234,34 @@ const ctx = canvas.getContext('2d');
 const nextCtx = document.getElementById('next').getContext('2d');
 const holdCtx = document.getElementById('hold').getContext('2d');
 
-// --- INITIALIZATION (修正: 堅牢なサイズ計算) ---
+// --- MAIN INIT ---
 function init() {
-    // コンテナサイズ取得失敗時のフォールバック計算
-    // Window幅 - サイドパネル(140) - 余白(40)
     let availW = window.innerWidth - 180;
-    let availH = window.innerHeight - 240; // コントローラー等を引く
-
-    // 負の値になったら最低限の値を保証
+    let availH = window.innerHeight - 240;
     if (availW < 100) availW = 200;
     if (availH < 200) availH = 400;
 
-    // ブロックサイズ決定
     const sizeByW = Math.floor(availW / COLS);
     const sizeByH = Math.floor(availH / ROWS);
     BLOCK_SIZE = Math.min(sizeByW, sizeByH);
     
-    // キャンバスサイズ設定
     canvas.width = BLOCK_SIZE * COLS;
     canvas.height = BLOCK_SIZE * ROWS;
 
-    // サブキャンバス設定
     const subBlock = 14;
     document.getElementById('next').width = subBlock * 5;
     document.getElementById('next').height = subBlock * 12;
     document.getElementById('hold').width = subBlock * 5;
     document.getElementById('hold').height = subBlock * 5;
 
-    // スケール適用 (ここが重要)
-    ctx.setTransform(1, 0, 0, 1, 0, 0); 
-    ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
-    
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
     nextCtx.setTransform(1, 0, 0, 1, 0, 0); nextCtx.scale(subBlock, subBlock);
     holdCtx.setTransform(1, 0, 0, 1, 0, 0); holdCtx.scale(subBlock, subBlock);
 
-    // グリッドが空ならゲーム開始
-    if (!grid || grid.length === 0) {
-        resetGame();
-    } else {
-        draw();
-    }
+    if (!grid || grid.length === 0) resetGame();
+    else draw();
+    
+    Sound.init();
 }
 
 function resetGame() {
@@ -231,23 +279,26 @@ function resetGame() {
     if (animationId) cancelAnimationFrame(animationId);
     lastTime = performance.now();
     gameLoop(lastTime);
+    
+    // BGM Restart if enabled
+    if (Sound.enabled) {
+        Sound.bgm.currentTime = 0;
+        Sound.bgm.play().catch(()=>{});
+    }
 }
 
-// --- GAME LOOP ---
 function gameLoop(time = 0) {
     if (gameOver) return;
     const deltaTime = time - lastTime;
     lastTime = time;
 
-    // 消去アニメーション
     if (clearingRows.length > 0) {
-        if (time - clearAnimStart > 200) finalizeClear(); // 200ms
+        if (time - clearAnimStart > 200) finalizeClear();
         draw();
         animationId = requestAnimationFrame(gameLoop);
         return;
     }
 
-    // 落下処理
     dropCounter += deltaTime;
     if (dropCounter > dropInterval) {
         playerDrop();
@@ -257,28 +308,21 @@ function gameLoop(time = 0) {
     animationId = requestAnimationFrame(gameLoop);
 }
 
-// --- DRAW ---
 function draw() {
-    // 背景
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, COLS, ROWS);
-
-    // 盤面
     drawMatrix(grid, {x:0, y:0}, ctx);
 
-    // 消去エフェクト
     if (clearingRows.length > 0) {
         ctx.fillStyle = '#fff';
         clearingRows.forEach(y => ctx.fillRect(0, y, COLS, 1));
     } else {
-        // ゴースト
         let ghostPos = { ...player.pos };
         while (!collide(grid, { pos: ghostPos, matrix: player.matrix })) ghostPos.y++;
         ghostPos.y--;
         ctx.globalAlpha = 0.2;
         drawMatrix(player.matrix, ghostPos, ctx, player.colorIdx);
         
-        // プレイヤー
         ctx.globalAlpha = 1.0;
         drawMatrix(player.matrix, player.pos, ctx, player.colorIdx);
     }
@@ -292,7 +336,6 @@ function drawMatrix(matrix, offset, context, colorIdxOverride = null) {
             if (idx !== 0) {
                 context.fillStyle = COLORS[idx];
                 context.fillRect(x + offset.x, y + offset.y, 1, 1);
-                // 立体感
                 context.lineWidth = 0.05;
                 context.strokeStyle = 'rgba(255,255,255,0.5)';
                 context.strokeRect(x + offset.x, y + offset.y, 1, 1);
@@ -320,7 +363,6 @@ function drawSides() {
     }
 }
 
-// --- LOGIC ---
 function createPiece() {
     const idx = (Math.random() * 7 | 0) + 1;
     const data = PIECES[idx];
@@ -336,6 +378,8 @@ function playerReset() {
     canHold = true;
     if (collide(grid, player)) {
         gameOver = true;
+        Sound.play('gameover');
+        Sound.bgm.pause();
         document.getElementById('final-score').innerText = score;
         document.getElementById('game-over').style.display = 'block';
     }
@@ -344,14 +388,18 @@ function playerReset() {
 function playerDrop() {
     player.pos.y++;
     if (collide(grid, player)) {
-        player.pos.y--; merge(grid, player); playerReset(); arenaSweep(); dropCounter = 0;
+        player.pos.y--; merge(grid, player); 
+        Sound.play('drop');
+        playerReset(); arenaSweep(); dropCounter = 0;
     }
     dropCounter = 0;
 }
 
 function playerHardDrop() {
     while (!collide(grid, player)) player.pos.y++;
-    player.pos.y--; merge(grid, player); playerReset(); arenaSweep(); dropCounter = 0;
+    player.pos.y--; merge(grid, player); 
+    Sound.play('drop');
+    playerReset(); arenaSweep(); dropCounter = 0;
 }
 
 function playerMove(dir) {
@@ -368,6 +416,7 @@ function playerRotate(dir) {
             rotate(player.matrix, -dir); player.pos.x = pos; return;
         }
     }
+    Sound.play('rotate');
 }
 
 function rotate(matrix, dir) {
@@ -379,6 +428,7 @@ function rotate(matrix, dir) {
 
 function playerHold() {
     if (!canHold || gameOver) return;
+    Sound.play('rotate');
     const current = { matrix: player.matrix, colorIdx: player.colorIdx };
     if (holdPiece === null) {
         holdPiece = current; playerReset();
@@ -414,7 +464,10 @@ function arenaSweep() {
         for (let x = 0; x < grid[y].length; ++x) if (grid[y][x] === 0) continue outer;
         rows.push(y);
     }
-    if (rows.length > 0) { clearingRows = rows; clearAnimStart = performance.now(); }
+    if (rows.length > 0) { 
+        clearingRows = rows; clearAnimStart = performance.now(); 
+        Sound.play('clear');
+    }
 }
 
 function finalizeClear() {
@@ -479,14 +532,17 @@ btnDown.addEventListener('mouseleave', stopSoftDrop);
 document.getElementById('restart-btn').addEventListener('click', resetGame);
 document.getElementById('restart-btn').addEventListener('touchstart', resetGame);
 
-// --- STARTUP ---
-// 初期化を複数回試行して確実に画面サイズを取得する
+document.getElementById('sound-toggle').addEventListener('click', () => Sound.toggle());
+document.getElementById('sound-toggle').addEventListener('touchstart', (e) => {
+    e.preventDefault(); Sound.toggle();
+});
+
 init();
 window.addEventListener('resize', init);
 window.addEventListener('load', init);
 setTimeout(init, 100);
 setTimeout(init, 500);
-setTimeout(init, 1000); // 念のため1秒後にも
+setTimeout(init, 1000);
 </script>
 </body>
 </html>
