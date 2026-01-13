@@ -320,7 +320,15 @@
     let opponentHandCounts = {};
     let nameDialogCallback = null;
     
-    function showTitle(){document.getElementById('titleScreen').style.display='flex';document.getElementById('lobbyScreen').style.display='none';document.getElementById('waitingScreen').style.display='none';document.getElementById('gameArea').style.display='none';document.getElementById('resultModal').style.display='none';}
+    function showTitle(){
+        isRev = false;
+        updateRevUI();
+        document.getElementById('titleScreen').style.display='flex';
+        document.getElementById('lobbyScreen').style.display='none';
+        document.getElementById('waitingScreen').style.display='none';
+        document.getElementById('gameArea').style.display='none';
+        document.getElementById('resultModal').style.display='none';
+    }
     function showLobby(){showTitle();document.getElementById('titleScreen').style.display='none';document.getElementById('lobbyScreen').style.display='flex';refreshRooms();}
     function showWaiting(){showTitle();document.getElementById('titleScreen').style.display='none';document.getElementById('waitingScreen').style.display='flex';}
     
@@ -332,9 +340,30 @@
         document.getElementById('resultModal').style.display='none';
     }
     
-    function backToTitle(){if(ws){ws.close();ws=null;}roomId=null;isHost=false;playerNames=[];opponentHandCounts={};document.getElementById('titleScreen').style.display='flex';document.getElementById('lobbyScreen').style.display='none';document.getElementById('waitingScreen').style.display='none';document.getElementById('gameArea').style.display='none';document.getElementById('resultModal').style.display='none';}
+    function backToTitle(){
+        if(ws){ws.close();ws=null;}
+        roomId=null;isHost=false;playerNames=[];opponentHandCounts={};
+        isRev = false;
+        updateRevUI();
+        document.getElementById('titleScreen').style.display='flex';
+        document.getElementById('lobbyScreen').style.display='none';
+        document.getElementById('waitingScreen').style.display='none';
+        document.getElementById('gameArea').style.display='none';
+        document.getElementById('resultModal').style.display='none';
+    }
     
-    function leaveRoom(){if(ws){ws.close();ws=null;}roomId=null;isHost=false;playerNames=[];opponentHandCounts={};document.getElementById('lobbyScreen').style.display='flex';document.getElementById('waitingScreen').style.display='none';document.getElementById('titleScreen').style.display='none';document.getElementById('gameArea').style.display='none';document.getElementById('resultModal').style.display='none';refreshRooms();}
+    function leaveRoom(){
+        if(ws){ws.close();ws=null;}
+        roomId=null;isHost=false;playerNames=[];opponentHandCounts={};
+        isRev = false;
+        updateRevUI();
+        document.getElementById('lobbyScreen').style.display='flex';
+        document.getElementById('waitingScreen').style.display='none';
+        document.getElementById('titleScreen').style.display='none';
+        document.getElementById('gameArea').style.display='none';
+        document.getElementById('resultModal').style.display='none';
+        refreshRooms();
+    }
 
     function refreshRooms(){fetch('https://universal-game-server.onrender.com/api/rooms?gameType=daifugo').then(r=>r.json()).then(data=>{const c=document.getElementById('roomsContainer');if(data.rooms.length===0){c.innerHTML='<p style="text-align:center;color:#888;">現在ルームはありません</p>';}else{c.innerHTML=data.rooms.map(room=>`<div class="room-item"><div class="room-info"><div class="room-name">${room.roomName||room.roomId}</div><div class="room-details">ホスト: ${room.hostName} | ${room.players}/${room.maxPlayers}人</div></div><button class="btn-join-room" onclick="joinRoom('${room.roomId}')">参加</button></div>`).join('');}}).catch(err=>{document.getElementById('roomsContainer').innerHTML='<p style="text-align:center;color:#f00;">ルーム取得エラー</p>';});}
 
@@ -996,7 +1025,7 @@
     
     function updateRevUI() {
         document.getElementById('revBadge').style.display = isRev?'block':'none';
-        document.body.style.filter = isRev?"hue-rotate(180deg)":"none";
+        document.getElementById('gameArea').style.filter = isRev?"hue-rotate(180deg)":"none";
     }
 
     function msg(txt) {
@@ -1051,6 +1080,9 @@
             isFoul=disqualified.includes(myPlayerNumber);
         }
         
+        isRev = false;
+        updateRevUI();
+        
         let title = "";
         let className = "";
         
@@ -1083,8 +1115,6 @@
         
         if(window.parent) window.parent.postMessage({type:'gameOver', score: (myRank===1 ? 100 : 0)}, '*');
     }
-    
-    function showTitle() { document.getElementById('resultModal').style.display='none'; document.getElementById('gameArea').style.display='none'; document.getElementById('titleScreen').style.display='flex'; }
 
 </script>
 
