@@ -5,6 +5,7 @@
 
 const express = require('express');
 const WebSocket = require('ws');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -21,6 +22,10 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
+
+// 静的ファイルを /static 以下のURLで配信する設定
+// publicフォルダの中身が https://あなたのURL/static/ファイル名 でアクセス可能になります
+app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // ============================================
 // Game Rooms Storage
