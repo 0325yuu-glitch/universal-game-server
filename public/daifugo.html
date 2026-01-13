@@ -2,7 +2,7 @@
 <html lang="ja"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大富豪オンライン Final Plus V15 (Fixed Opponent Display)</title>
+    <title>大富豪オンライン</title>
     <style>
         :root {
             --card-w: 72px; 
@@ -37,7 +37,6 @@
             display: none;
         }
 
-        /* --- Title Screen --- */
         .title-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85);
@@ -54,7 +53,6 @@
         .player-select { margin: 15px 0; display: flex; justify-content: center; gap: 15px; }
         .p-radio { transform: scale(1.5); }
 
-        /* --- Name Dialog --- */
         .name-dialog {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 9999;
@@ -76,7 +74,6 @@
         .btn-cancel { background: #95a5a6; color: #fff; }
         .btn-confirm { background: #27ae60; color: #fff; }
 
-        /* --- Lobby Screen --- */
         .lobby-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9);
@@ -101,7 +98,6 @@
         .room-details{font-size:0.9rem;color:#bbb;margin-top:5px;}
         .btn-join-room{background:#27ae60;color:white;padding:10px 20px;border:none;border-radius:6px;font-weight:bold;cursor:pointer;}
 
-        /* --- Waiting Room --- */
         .waiting-screen{position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);display:none;flex-direction:column;justify-content:center;align-items:center;z-index:5000;padding:20px;}
         .waiting-box{background:rgba(255,255,255,0.1);padding:40px;border-radius:15px;text-align:center;max-width:500px;width:90%;}
         .waiting-title{font-size:2rem;color:gold;margin-bottom:10px;}
@@ -120,7 +116,6 @@
         .btn-start-game:disabled{background:#555;cursor:not-allowed;opacity:0.5;}
         .btn-leave{background:#e74c3c;color:white;padding:15px 40px;border:none;border-radius:8px;font-size:1.2rem;font-weight:bold;cursor:pointer;}
 
-        /* --- Opponent Areas --- */
         .opponent {
             position: absolute;
             display: flex;
@@ -145,7 +140,6 @@
         .opp-left .player-label { top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .opp-right .player-label { top: 50%; right: 50%; transform: translate(50%, -50%); }
 
-        /* --- Field --- */
         .field-area {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 260px; height: 180px; pointer-events: none;
@@ -202,11 +196,6 @@
         @keyframes shine { 0%{opacity:0.8; transform:scale(1);} 50%{opacity:1; transform:scale(1.1);} 100%{opacity:0.8; transform:scale(1);} }
 
         .my-turn-label { position: absolute; bottom: 160px; left: 50%; transform: translateX(-50%); background: gold; color: black; padding: 2px 10px; border-radius: 10px; font-weight: bold; font-size: 12px; opacity: 0; transition: opacity 0.3s; z-index: 200; }
-
-        /* --- Debug Source Button --- */
-        .btn-source { position: fixed; bottom: 20px; right: 20px; width: 40px; height: 40px; background: rgba(255,255,255,0.2); color: white; border: 1px solid white; border-radius: 50%; font-size: 10px; z-index: 5000; display: flex; justify-content: center; align-items: center; cursor: pointer; }
-        .source-box { width: 90%; height: 80%; background: #fff; padding: 10px; display: flex; flex-direction: column; color: black; border-radius: 8px; }
-        textarea { flex: 1; margin-bottom: 10px; font-family: monospace; }
 
     </style>
 </head>
@@ -306,17 +295,6 @@
         <button class="btn btn-play" onclick="showTitle()">タイトルへ</button>
     </div>
 
-    <button class="btn-source" onclick="showSrc()">Code</button>
-    <div class="modal-overlay" id="srcModal">
-        <div class="source-box">
-            <textarea id="srcText" readonly=""></textarea>
-            <div style="display:flex; justify-content:space-between;">
-                <button onclick="copySrc()">コピー</button>
-                <button onclick="closeSrc()">閉じる</button>
-            </div>
-        </div>
-    </div>
-
 <script>
     const SUITS = ['♠', '♥', '♦', '♣'];
     const RANKS = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
@@ -358,9 +336,8 @@
     
     function leaveRoom(){if(ws){ws.close();ws=null;}roomId=null;isHost=false;playerNames=[];opponentHandCounts={};document.getElementById('lobbyScreen').style.display='flex';document.getElementById('waitingScreen').style.display='none';document.getElementById('titleScreen').style.display='none';document.getElementById('gameArea').style.display='none';document.getElementById('resultModal').style.display='none';refreshRooms();}
 
-    function refreshRooms(){fetch('https://universal-game-server.onrender.com/api/rooms?gameType=daifugo').then(r=>r.json()).then(data=>{const c=document.getElementById('roomsContainer');if(data.rooms.length===0){c.innerHTML='<p style="text-align:center;color:#888;">現在ルームはありません</p>';}else{c.innerHTML=data.rooms.map(room=>`<div class="room-item"><div class="room-info"><div class="room-name">${room.roomName||room.roomId}</div><div class="room-details">ホスト: ${room.hostName} | ${room.players}/${room.maxPlayers}人</div></div><button class="btn-join-room" onclick="joinRoom('${room.roomId}')">参加</button></div>`).join('');}}).catch(err=>{console.error('Failed to fetch rooms:',err);document.getElementById('roomsContainer').innerHTML='<p style="text-align:center;color:#f00;">ルーム取得エラー</p>';});}
+    function refreshRooms(){fetch('https://universal-game-server.onrender.com/api/rooms?gameType=daifugo').then(r=>r.json()).then(data=>{const c=document.getElementById('roomsContainer');if(data.rooms.length===0){c.innerHTML='<p style="text-align:center;color:#888;">現在ルームはありません</p>';}else{c.innerHTML=data.rooms.map(room=>`<div class="room-item"><div class="room-info"><div class="room-name">${room.roomName||room.roomId}</div><div class="room-details">ホスト: ${room.hostName} | ${room.players}/${room.maxPlayers}人</div></div><button class="btn-join-room" onclick="joinRoom('${room.roomId}')">参加</button></div>`).join('');}}).catch(err=>{document.getElementById('roomsContainer').innerHTML='<p style="text-align:center;color:#f00;">ルーム取得エラー</p>';});}
 
-    // --- 名前入力ダイアログ制御 ---
     function showNameDialog(callback){
         nameDialogCallback = callback;
         document.getElementById('playerNameInput').value = 'プレイヤー';
@@ -411,34 +388,24 @@
     
     function connectWebSocket(onReady){
         ws=new WebSocket(SERVER_URL);
-        ws.onopen=()=>{
-            console.log('✅ WebSocket connected');
-            if(onReady)onReady();
-        };
-        ws.onmessage=(event)=>{
-            const data=JSON.parse(event.data);
-            console.log('Received:',data);
-            handleServerMessage(data);
-        };
-        ws.onerror=(err)=>{console.error('WebSocket error:',err);alert('サーバー接続エラー');};
-        ws.onclose=()=>{console.log('WebSocket closed');};
+        ws.onopen=()=>{if(onReady)onReady();};
+        ws.onmessage=(event)=>{const data=JSON.parse(event.data);handleServerMessage(data);};
+        ws.onerror=(err)=>{alert('サーバー接続エラー');};
+        ws.onclose=()=>{};
     }
 
     function handleServerMessage(data){
         switch(data.type){
             case 'roomCreated':
-                console.log('✅ Room created:', data);
                 roomId=data.roomId;myPlayerNumber=data.playerNumber;isHost=data.isHost;showWaiting();document.getElementById('waitingRoomId').textContent=roomId;
                 break;
             case 'roomJoined':
-                console.log('✅ Room joined:', data);
                 roomId=data.roomId;myPlayerNumber=data.playerNumber;isHost=data.isHost;showWaiting();document.getElementById('waitingRoomId').textContent=roomId;
                 break;
             case 'playerJoined':updatePlayersList(data);break;
             case 'playerLeft':updatePlayersList(data);break;
             case 'gameStart':
-                console.log('🎮 Game start received:', data);
-                try{startOnlineGameReceived(data);}catch(e){console.error('Start error:',e);}
+                try{startOnlineGameReceived(data);}catch(e){}
                 break;
             case 'turnStart':handleTurnStart(data);break;
             case 'cardsPlayed':handleCardsPlayed(data);break;
@@ -447,7 +414,6 @@
             case 'playerFinished':handlePlayerFinished(data);break;
             case 'gameOver':handleGameOver(data);break;
             case 'error':
-                console.error('❌ Server error:', data.message);
                 alert('エラー: '+data.message);isProcessing=false;document.getElementById('btnPlay').disabled=false;document.getElementById('btnPass').disabled=false;
                 break;
         }
@@ -469,98 +435,71 @@
         const btnStart=document.getElementById('btnStartGame');
         if(isHost&&data.currentCount>=2){
             btnStart.disabled=false;
-            console.log('✅ Start button enabled');
         }else{
             btnStart.disabled=true;
-            console.log('⏳ Start button disabled');
         }
     }
 
     function startOnlineGame(){
         if(!isHost)return;
-        console.log('🚀 Sending startGame message...');
         ws.send(JSON.stringify({type:'startGame'}));
     }
     
     function startOnlineGameReceived(data){
-        console.log('🔍 RAW gameStart data:', JSON.stringify(data));
+        gameMode='online';
+        myPlayerNumber=data.playerNumber;
+        playerNames = data.playerNames || data.players || [];
+        totalPlayers = data.maxPlayers || playerNames.length || 4;
         
-        try {
-            gameMode='online';
-            myPlayerNumber=data.playerNumber;
+        const myHand=(data.hand||[]).map(c => {
+            let rankForCalc = String(c.r);
+            let val = RANKS.indexOf(rankForCalc); 
+            if(c.r === 'JK' || c.isJ) val = 99;
             
-            // プレイヤー名の取得（様々な形式に対応）
-            playerNames = data.playerNames || data.players || [];
-            console.log('👥 Player names:', playerNames);
-
-            totalPlayers = data.maxPlayers || playerNames.length || 4;
-            console.log('👥 Total players:', totalPlayers);
-            
-            // 自分の手札を処理
-            const myHand=(data.hand||[]).map(c => {
-                let rankForCalc = String(c.r);
-                let val = RANKS.indexOf(rankForCalc); 
-                if(c.r === 'JK' || c.isJ) val = 99;
-                
-                return {
-                    s: c.s,
-                    r: c.r,
-                    v: val, 
-                    isJ: c.isJ || c.r === 'JK',
-                    id: Math.random().toString(36),
-                    sel: false,
-                    original: JSON.parse(JSON.stringify(c))
-                };
-            });
-            
-            console.log('🃏 My hand count:', myHand.length);
-            
-            // 相手の手札枚数を初期化
-            // サーバーから handCounts が来る場合はそれを使用
-            // そうでなければ自分の手札枚数を基準に推測
-            const myHandCount = myHand.length;
-            
-            players=[];
-            opponentHandCounts = {};
-            
-            for(let i=0;i<totalPlayers;i++){
-                if(i===myPlayerNumber){
-                    players.push(myHand);
-                }else{
-                    players.push([]);
-                    // サーバーから手札枚数情報がある場合
-                    if(data.handCounts && data.handCounts[i] !== undefined) {
-                        opponentHandCounts[i] = data.handCounts[i];
-                    } else {
-                        // なければ自分の手札枚数と同じと仮定
-                        opponentHandCounts[i] = myHandCount;
-                    }
+            return {
+                s: c.s,
+                r: c.r,
+                v: val, 
+                isJ: c.isJ || c.r === 'JK',
+                id: Math.random().toString(36),
+                sel: false,
+                original: JSON.parse(JSON.stringify(c))
+            };
+        });
+        
+        const myHandCount = myHand.length;
+        
+        players=[];
+        opponentHandCounts = {};
+        
+        for(let i=0;i<totalPlayers;i++){
+            if(i===myPlayerNumber){
+                players.push(myHand);
+            }else{
+                players.push([]);
+                if(data.handCounts && data.handCounts[i] !== undefined) {
+                    opponentHandCounts[i] = data.handCounts[i];
+                } else {
+                    opponentHandCounts[i] = myHandCount;
                 }
             }
-            
-            console.log('🎴 Opponent hand counts:', opponentHandCounts);
+        }
 
-            finished=[];disqualified=[];field=[];passCnt=0;isRev=false;
-            turn=data.starter;isProcessing=false;
+        finished=[];disqualified=[];field=[];passCnt=0;isRev=false;
+        turn=data.starter;isProcessing=false;
 
-            sortHand(players[myPlayerNumber]);
+        sortHand(players[myPlayerNumber]);
 
-            showGame();
-            setupOpponentAreas();
-            updateUI();
-            updateRevUI();
+        showGame();
+        setupOpponentAreas();
+        updateUI();
+        updateRevUI();
 
-            if(turn===myPlayerNumber){
-                document.getElementById('myTurnLbl').style.opacity=1;
-                renderControls();
-            }else{
-                document.getElementById('myTurnLbl').style.opacity=0;
-            }
-            console.log('✅ Online game started');
-            
-        } catch(e) {
-            console.error('❌',e.message, e.stack);
-            alert('Error: '+e.message);
+        if(turn===myPlayerNumber){
+            document.getElementById('myTurnLbl').style.opacity=1;
+            renderControls();
+        }else{
+            document.getElementById('myTurnLbl').style.opacity=0;
         }
     }
 
@@ -602,7 +541,6 @@
         const count = opponentHandCounts[playerIdx] || 0;
         let pName = playerNames[playerIdx] || `Player ${playerIdx+1}`;
         lbl.textContent=`${pName} (${count})`;
-        console.log(`📝 Label ${uiIdx} updated: ${pName} (${count})`);
     }
 
     function getPlayerIndexFromUI(uiIdx){
@@ -632,7 +570,7 @@
             return -1;
         }else{
             const offset = (playerIdx - myPlayerNumber + 4) % 4;
-            return offset; // 1, 2, or 3
+            return offset;
         }
     }
 
@@ -666,7 +604,6 @@
         passCnt=0;
         renderField();
 
-        // 自分がカードを出した場合、手札から削除
         if(data.player === myPlayerNumber) {
             const playedOriginals = data.cards.map(c => JSON.stringify({s: c.s, r: c.r}));
             players[myPlayerNumber] = players[myPlayerNumber].filter(card => {
@@ -676,12 +613,10 @@
             renderHand0();
         }
 
-        // 相手の手札枚数を更新
         if(data.player !== myPlayerNumber){
             if(data.remainingCards !== undefined) {
                 opponentHandCounts[data.player] = data.remainingCards;
             } else {
-                // remainingCardsがない場合、出したカード枚数分減らす
                 opponentHandCounts[data.player] = Math.max(0, (opponentHandCounts[data.player] || 0) - data.cards.length);
             }
             
@@ -939,8 +874,6 @@
                     }
                 });
                 
-                console.log('📤 Sending cards:', JSON.stringify(payload));
-                
                 ws.send(JSON.stringify({
                     type:'playCards',
                     cards: payload
@@ -991,7 +924,6 @@
     }
 
     function renderOppHand(playerIdx) {
-        // オンラインモードでのUI位置を取得
         const uiId = gameMode === 'online' ? getUIIndexFromPlayer(playerIdx) : getUIIndex(playerIdx);
         if(uiId < 1 || uiId > 3) return;
         
@@ -1001,7 +933,6 @@
         
         el.innerHTML = '';
         
-        // オンラインモードでは opponentHandCounts を使用、CPUモードでは players 配列を使用
         const count = gameMode === 'online' 
             ? (opponentHandCounts[playerIdx] || 0)
             : (players[playerIdx] ? players[playerIdx].length : 0);
@@ -1154,9 +1085,6 @@
     }
     
     function showTitle() { document.getElementById('resultModal').style.display='none'; document.getElementById('gameArea').style.display='none'; document.getElementById('titleScreen').style.display='flex'; }
-    function showSrc(){ document.getElementById('srcText').value=document.documentElement.outerHTML; document.getElementById('srcModal').style.display='flex'; }
-    function closeSrc(){ document.getElementById('srcModal').style.display='none'; }
-    function copySrc(){ document.getElementById('srcText').select(); document.execCommand('copy'); alert('Copied'); }
 
 </script>
 
