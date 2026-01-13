@@ -1,7 +1,7 @@
 <html lang="ja"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大富豪オンライン Final Plus V9 (Fixed)</title>
+    <title>大富豪オンライン Final Plus V10 (Fixed)</title>
     <style>
         :root {
             --card-w: 72px; 
@@ -481,10 +481,6 @@
         ws.send(JSON.stringify({type:'startGame'}));
     }
     
-    // -------------------------------------------------------------------
-    // 【修正】 オンラインゲーム開始時の手札処理
-    // サーバーからのカードには v (強さ) が含まれていない場合があるので補完する
-    // -------------------------------------------------------------------
     function startOnlineGameReceived(data){
         console.log('🔍 RAW:', JSON.stringify(data));
         
@@ -494,15 +490,15 @@
             playerNames=data.playerNames||[];
             totalPlayers=playerNames.length;
             
-            // 修正箇所: 手札の v (value) を RANKS から計算してセット
+            // 【修正】型変換 (String) を追加
             const myHand=(data.hand||[]).map(c => {
-                let val = RANKS.indexOf(c.r); // '3'=0, '2'=12
+                let val = RANKS.indexOf(String(c.r)); // ここでString変換
                 if(c.r === 'JK' || c.isJ) val = 99;
                 
                 return {
                     s: c.s,
                     r: c.r,
-                    v: val, // 強さを付与
+                    v: val, 
                     isJ: c.isJ || c.r === 'JK',
                     id: Math.random().toString(36),
                     sel: false
@@ -536,7 +532,7 @@
             }else{
                 document.getElementById('myTurnLbl').style.opacity=0;
             }
-            console.log('✅ Online game started');
+            console.log('✅ Online game started (Fixed v calculation)');
             
         } catch(e) {
             console.error('❌',e.message);
@@ -551,14 +547,10 @@
 
     function handleTurnStart(data){turn=data.currentPlayer;isProcessing=false;if(turn===myPlayerNumber){document.getElementById('myTurnLbl').style.opacity=1;renderControls();}else{document.getElementById('myTurnLbl').style.opacity=0;document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true;}}
     
-    // -------------------------------------------------------------------
-    // 【修正】 他プレイヤーがカードを出した時の処理
-    // ここでも v (強さ) を補完して場に出すことで、isValidの比較が正常に動くようにする
-    // -------------------------------------------------------------------
     function handleCardsPlayed(data){
-        // 修正箇所: 出されたカードに強さを付与
+        // 【修正】型変換 (String) を追加
         const playedCards = data.cards.map(c => {
-            let val = RANKS.indexOf(c.r);
+            let val = RANKS.indexOf(String(c.r)); // ここでString変換
             if(c.r === 'JK' || c.isJ) val = 99;
             return {
                 s: c.s,
@@ -683,7 +675,6 @@
         if(sel.length !== last.length) return false;
         if(last.length===1 && last[0].isJ && sel.length===1 && sel[0].s==='♠' && sel[0].r==='3') return true;
         
-        // ここでの比較に c.v が必須
         const myS = norm.length ? (isRev? 12-norm[0].v : norm[0].v) : 999;
         const laS = last.filter(c=>!c.isJ).length ? (isRev? 12-last.filter(c=>!c.isJ)[0].v : last.filter(c=>!c.isJ)[0].v) : 999;
         return myS > laS;
