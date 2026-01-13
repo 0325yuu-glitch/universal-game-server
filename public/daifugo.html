@@ -1,7 +1,7 @@
 <html lang="ja"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大富豪オンライン Final Plus V11 (Fixed Types)</title>
+    <title>大富豪オンライン Final Plus V12 (Strict Type Fix)</title>
     <style>
         :root {
             --card-w: 72px; 
@@ -490,16 +490,16 @@
             playerNames=data.playerNames||[];
             totalPlayers=playerNames.length;
             
-            // 【重要修正】サーバーから数字で来ても、強制的にString型に変換して保存する
+            // 【重要】サーバーから来たデータ(c.r)の型はそのまま保存する！
             const myHand=(data.hand||[]).map(c => {
-                let rankStr = String(c.r); // 強制文字列化
-                let val = RANKS.indexOf(rankStr); 
+                let rankForCalc = String(c.r); // 計算用には文字列化
+                let val = RANKS.indexOf(rankForCalc); 
                 
                 if(c.r === 'JK' || c.isJ) val = 99;
                 
                 return {
                     s: c.s,
-                    r: rankStr, // 文字列として保存 (これで送り返すときも文字列になる)
+                    r: c.r, // サーバーから来た生の値(数値なら数値のまま)を保存
                     v: val, 
                     isJ: c.isJ || c.r === 'JK',
                     id: Math.random().toString(36),
@@ -534,7 +534,7 @@
             }else{
                 document.getElementById('myTurnLbl').style.opacity=0;
             }
-            console.log('✅ Online game started (Fixed Types)');
+            console.log('✅ Online game started (Strict Types)');
             
         } catch(e) {
             console.error('❌',e.message);
@@ -550,14 +550,13 @@
     function handleTurnStart(data){turn=data.currentPlayer;isProcessing=false;if(turn===myPlayerNumber){document.getElementById('myTurnLbl').style.opacity=1;renderControls();}else{document.getElementById('myTurnLbl').style.opacity=0;document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true;}}
     
     function handleCardsPlayed(data){
-        // 【重要修正】ここでもString型に強制変換
         const playedCards = data.cards.map(c => {
-            let rankStr = String(c.r);
-            let val = RANKS.indexOf(rankStr);
+            let rankForCalc = String(c.r);
+            let val = RANKS.indexOf(rankForCalc);
             if(c.r === 'JK' || c.isJ) val = 99;
             return {
                 s: c.s,
-                r: rankStr, // 文字列として保存
+                r: c.r, // 生の値
                 v: val,
                 isJ: c.isJ || c.r === 'JK'
             };
@@ -782,7 +781,29 @@
         }
     }
 
-    function actionPlay(){if(isProcessing)return;const sel=players[myPlayerNumber].filter(c=>c.sel);if(isValid(sel)){isProcessing=true;document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true;if(gameMode==='online'){ws.send(JSON.stringify({type:'playCards',cards:sel.map(c=>({s:c.s,r:c.r,v:c.v,isJ:c.isJ||false}))}));}else{playCards(myPlayerNumber,sel);}}}
+    function actionPlay(){
+        if(isProcessing)return;
+        const sel=players[myPlayerNumber].filter(c=>c.sel);
+        if(isValid(sel)){
+            isProcessing=true;
+            document.getElementById('btnPlay').disabled=true;
+            document.getElementById('btnPass').disabled=true;
+            if(gameMode==='online'){
+                // 【重要】サーバーへ返す際、必要なデータのみを送る(v等は送らない)
+                // c.rもそのまま返す（数値なら数値のまま）
+                ws.send(JSON.stringify({
+                    type:'playCards',
+                    cards:sel.map(c=>({
+                        s:c.s,
+                        r:c.r, 
+                        isJ:c.isJ||false
+                    }))
+                }));
+            }else{
+                playCards(myPlayerNumber,sel);
+            }
+        }
+    }
     
     function actionPass(){if(isProcessing)return;if(turn===myPlayerNumber&&field.length===0)return;isProcessing=true;document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true;if(gameMode==='online'){ws.send(JSON.stringify({type:'pass'}));}else{pass();}}
     
@@ -889,7 +910,7 @@
             d.innerHTML = `<div class="card-corner">J</div><div class="card-inner"><div class="face-img">🃏</div></div><div class="card-corner bottom">J</div>`;
             return d;
         }
-        const pips = generatePips(c.r, c.s);
+        const pips = generatePips(String(c.r), c.s);
         d.innerHTML = `<div class="card-corner">${c.r}<br>${c.s}</div><div class="card-inner">${pips}</div><div class="card-corner bottom">${c.r}<br>${c.s}</div>`;
         return d;
     }
