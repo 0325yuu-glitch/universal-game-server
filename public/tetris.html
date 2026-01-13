@@ -3,328 +3,300 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Gravity Richest Tetris</title>
+    <title>Gravity Cyber Tetris</title>
     <style>
         /* =========================================
-           基本設定＆リッチデザイン定義
+           TETRIS 99 Style Cyber CSS
         ========================================= */
         :root {
-            --bg-color: #0a0a0a;
-            --text-color: #eee;
-            --accent-color: #00f7ff; /* ネオンシアン */
-            --accent-secondary: #ff00d4; /* ネオンピンク */
-            
-            /* ボタンデザイン用 */
-            --btn-bg-grad: linear-gradient(145deg, rgba(40,40,40,0.8), rgba(20,20,20,0.9));
-            --btn-border: 1px solid rgba(255,255,255,0.15);
-            --btn-shadow: 0 4px 15px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.1);
-            --btn-active-shadow: 0 2px 5px rgba(0,0,0,0.4), inset 0 2px 5px rgba(0,0,0,0.3);
-            --btn-text-shadow: 0 0 10px var(--accent-color);
+            --bg-color: #050510;
+            --grid-line: rgba(255, 255, 255, 0.1);
+            --neon-blue: #00f3ff;
+            --neon-pink: #ff0055;
+            --glass-bg: rgba(20, 30, 40, 0.85);
+            --border-glow: 0 0 10px var(--neon-blue), inset 0 0 5px rgba(0, 243, 255, 0.3);
         }
 
         body {
             margin: 0;
             padding: 0;
             background-color: var(--bg-color);
-            background-image: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
-            color: var(--text-color);
-            font-family: 'Helvetica Neue', Arial, sans-serif;
+            /* サイバーなグリッド背景 */
+            background-image: 
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
             touch-action: none;
             display: flex;
+            flex-direction: column;
             justify-content: center;
         }
 
-        /* アプリ全体のコンテナ */
         #game-wrapper {
             display: flex;
             flex-direction: column;
             height: 100%;
             width: 100%;
-            max-width: 600px; /* タブレットでの広がりすぎ防止 */
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            max-width: 600px;
+            margin: 0 auto;
         }
 
-        /* =========================================
-           ヘッダー (スコア等)
-        ========================================= */
-        header {
-            flex: 0 0 auto; /* 高さを固定しない */
-            display: flex;
-            justify-content: space-around;
-            padding: 15px 10px;
-            background: rgba(0,0,0,0.6);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            z-index: 10;
-        }
-        .stat-box {
-            text-align: center;
-            text-transform: uppercase;
-            font-size: 12px;
-            color: #aaa;
-            letter-spacing: 1px;
-        }
-        .stat-box span {
-            display: block;
-            font-size: 22px;
-            color: var(--accent-color);
-            font-weight: 800;
-            text-shadow: 0 0 10px rgba(0, 247, 255, 0.5);
-            margin-top: 2px;
-        }
-
-        /* =========================================
-           メインゲームエリア (Canvas)
-        ========================================= */
+        /* --- メインエリア (HOLD - BOARD - NEXT) --- */
         #main-area {
-            flex: 1 1 auto; /* 残りのスペースを全て使う */
+            flex: 1;
             position: relative;
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* 上寄せ */
-            padding: 20px 10px 0; /* 上に少し余白 */
-            overflow: hidden;
+            align-items: center; /* 垂直中央揃え */
+            padding: 10px;
+            gap: 10px;
         }
 
-        /* ゲームキャンバスのコンテナ */
-        .canvas-container {
+        /* ゲームボード */
+        .board-container {
             position: relative;
-            box-shadow: 0 0 30px rgba(0, 247, 255, 0.2);
-            border-radius: 4px;
-            overflow: hidden;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 10;
         }
         canvas#tetris {
-            background: rgba(0,0,0,0.8);
-            display: block; /* 隙間をなくす */
+            display: block;
         }
 
-        /* サイドパネル (HOLD/NEXT) - 絶対配置でCanvasの横に置く */
-        .side-panel {
-            position: absolute;
-            top: 20px;
+        /* サイドパネル共通 */
+        .side-col {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            height: 100%;
+            gap: 20px;
+            width: 70px; /* パネル幅固定 */
+        }
+        
+        /* 左カラム (HOLD & INFO) */
+        .left-col { justify-content: flex-start; padding-top: 20px;}
+        /* 右カラム (NEXT) */
+        .right-col { justify-content: flex-start; padding-top: 20px;}
+
+        .panel-box {
+            background: var(--glass-bg);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 5px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            border-radius: 8px;
-            border: var(--btn-border);
+            position: relative;
         }
-        .panel-label {
-            font-size: 12px;
+        /* ネオン装飾 */
+        .panel-box::before {
+            content: '';
+            position: absolute;
+            top: -1px; left: -1px; right: -1px;
+            height: 2px;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        .label {
+            font-size: 10px;
+            color: #aaa;
+            margin-bottom: 2px;
             font-weight: bold;
-            color: var(--accent-secondary);
-            margin-bottom: 5px;
             letter-spacing: 1px;
         }
-        .side-panel canvas {
-            background: transparent;
-        }
-        #panel-hold { left: 10px; }
-        #panel-next { right: 10px; }
 
-        /* ゲームオーバー表示 */
+        /* HOLD Canvas */
+        #hold { width: 60px; height: 60px; }
+        
+        /* NEXT Canvas (縦長) */
+        #next { width: 60px; height: 180px; }
+
+        /* スコア表示 */
+        .stats {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            text-align: center;
+        }
+        .stat-val {
+            font-size: 18px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+
+        /* --- ゲームオーバー表示 --- */
         #game-over {
             position: absolute;
             top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(20, 20, 20, 0.95);
-            padding: 30px 40px;
-            border-radius: 15px;
-            border: 2px solid var(--accent-secondary);
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid var(--neon-pink);
+            box-shadow: 0 0 30px var(--neon-pink);
+            padding: 30px;
             text-align: center;
             z-index: 100;
             display: none;
-            box-shadow: 0 0 50px rgba(255, 0, 212, 0.5);
+            border-radius: 10px;
+            width: 80%;
         }
-        #game-over h2 {
-            margin: 0 0 15px;
-            color: var(--accent-secondary);
-            font-size: 32px;
-            text-shadow: 0 0 10px rgba(255, 0, 212, 0.8);
-        }
-        #game-over p { font-size: 18px; color: #ccc; }
-        #final-score { color: var(--accent-color); font-weight: bold; font-size: 28px; }
+        #game-over h2 { color: var(--neon-pink); margin: 0 0 10px 0; font-size: 2em; text-transform: uppercase; }
         #restart-btn {
-            margin-top: 25px;
-            padding: 12px 30px;
-            background: linear-gradient(45deg, var(--accent-color), var(--accent-secondary));
+            background: var(--neon-blue);
             border: none;
-            border-radius: 30px;
-            color: #fff;
+            padding: 15px 30px;
             font-size: 18px;
             font-weight: bold;
+            color: #000;
+            border-radius: 30px;
+            margin-top: 20px;
             cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
+            box-shadow: 0 0 15px var(--neon-blue);
         }
-        #restart-btn:active { transform: scale(0.95); }
 
-        /* =========================================
-           リッチコントローラーエリア
-        ========================================= */
+        /* --- コントローラー --- */
         #controls {
-            flex: 0 0 auto; /* 高さを自動計算 */
-            padding: 15px;
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(10px); /* すりガラス効果 */
-            border-top: 1px solid rgba(255,255,255,0.1);
-            
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        /* 上段 (HOLD / HARD DROP) */
-        .controls-top {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-        }
-
-        /* 下段 (移動 / 回転) */
-        .controls-bottom {
+            flex: 0 0 200px; /* 固定高さ */
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            height: 140px; /* メイン操作部の高さ */
+            padding: 0 30px;
+            position: relative;
         }
 
         /* 十字キーエリア */
         .d-pad {
             position: relative;
-            width: 140px; height: 140px;
+            width: 160px; height: 160px;
         }
-        /* アクションキーエリア */
-        .action-pad {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 120px; height: 140px;
-        }
-
-        /* 共通ボタンスタイル */
+        
+        /* ボタン共通 */
         .btn {
-            background: var(--btn-bg-grad);
-            border: var(--btn-border);
-            box-shadow: var(--btn-shadow);
-            border-radius: 50%; /* 基本は丸 */
+            position: absolute;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(5px);
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 28px;
-            color: rgba(255,255,255,0.8);
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-            transition: all 0.05s;
-            position: absolute; /* 十字キー配置用 */
+            color: #fff;
+            font-size: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            transition: transform 0.05s, background 0.05s;
         }
         .btn:active {
-            box-shadow: var(--btn-active-shadow);
-            transform: scale(0.92);
-            color: #fff;
+            background: rgba(0, 243, 255, 0.3);
+            transform: scale(0.95);
+            border-color: var(--neon-blue);
         }
-        /* アイコンSVG用 */
-        .btn svg {
-            width: 60%; height: 60%;
-            fill: currentColor;
-            filter: drop-shadow(0 0 5px currentColor);
-        }
-
-        /* 各ボタンの個別設定 */
-        /* HOLD */
-        #btn-hold {
-            position: relative;
-            width: 80px; height: 50px;
-            border-radius: 25px;
-            font-size: 14px; font-weight: bold;
-            color: orange;
-            text-shadow: 0 0 5px orange;
-        }
-        /* HARD DROP */
-        #btn-hard {
-            position: relative;
-            width: 80px; height: 50px;
-            border-radius: 25px;
-            font-size: 14px; font-weight: bold;
-            color: var(--accent-color);
-            text-shadow: 0 0 5px var(--accent-color);
-        }
+        .btn svg { width: 30px; height: 30px; fill: currentColor; filter: drop-shadow(0 0 2px currentColor); }
 
         /* 十字キー配置 */
-        #btn-left { width: 60px; height: 60px; top: 40px; left: 0; }
-        #btn-right{ width: 60px; height: 60px; top: 40px; right: 0; }
-        #btn-down {
-            width: 60px; height: 70px; /* 少し縦長 */
-            bottom: 0; left: 40px;
-            border-radius: 30px; /* 楕円 */
-        }
+        #btn-up    { width: 50px; height: 50px; top: 0; left: 55px; border-radius: 10px 10px 5px 5px; } /* HARD DROP */
+        #btn-left  { width: 50px; height: 50px; top: 55px; left: 0; border-radius: 10px 5px 5px 10px; }
+        #btn-right { width: 50px; height: 50px; top: 55px; right: 0; border-radius: 5px 10px 10px 5px; }
+        #btn-down  { width: 50px; height: 60px; bottom: 0; left: 55px; border-radius: 5px 5px 10px 10px; }
 
-        /* 回転ボタン (最も大きく、押しやすく) */
+        /* 回転ボタン */
+        .action-area {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100px; height: 100px;
+        }
         #btn-rot {
             position: relative;
-            width: 100px; height: 100px;
-            color: var(--accent-secondary);
-            background: linear-gradient(145deg, rgba(60,20,40,0.8), rgba(30,10,20,0.9));
+            width: 90px; height: 90px;
+            border-radius: 50%;
+            background: rgba(255, 0, 85, 0.2);
+            border: 2px solid var(--neon-pink);
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
         }
-        #btn-rot svg { width: 70%; height: 70%; }
+        #btn-rot:active {
+            background: rgba(255, 0, 85, 0.5);
+            transform: scale(0.95);
+        }
+        #btn-rot svg { width: 40px; height: 40px; }
+
+        /* HOLDボタン (画面上のタッチ用補助 - 今回は非表示または左上に小さく配置) */
+        #btn-hold-touch {
+            position: absolute;
+            top: -40px; left: 20px;
+            width: 60px; height: 30px;
+            font-size: 12px;
+            background: orange;
+            color: black;
+            font-weight: bold;
+            border-radius: 15px;
+            display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 0 10px orange;
+        }
 
     </style>
 </head>
 <body>
     <div id="game-wrapper">
-        <header>
-            <div class="stat-box">Score<span id="score">0</span></div>
-            <div class="stat-box">Level<span id="level">1</span></div>
-            <div class="stat-box">Lines<span id="lines">0</span></div>
-        </header>
-
         <div id="main-area">
-            <div class="side-panel" id="panel-hold">
-                <div class="panel-label">HOLD</div>
-                <canvas id="hold" width="60" height="60"></canvas>
+            <div class="side-col left-col">
+                <div class="panel-box">
+                    <div class="label">HOLD</div>
+                    <canvas id="hold"></canvas>
+                </div>
+                <div class="stats">
+                    <div class="label">SCORE</div>
+                    <div class="stat-val" id="score">0</div>
+                    <div class="label" style="margin-top:10px;">LINES</div>
+                    <div class="stat-val" id="lines">0</div>
+                    <div class="label" style="margin-top:10px;">LEVEL</div>
+                    <div class="stat-val" id="level">1</div>
+                </div>
             </div>
 
-            <div class="canvas-container">
-                <canvas id="tetris" width="200" height="400"></canvas>
+            <div class="board-container">
+                <canvas id="tetris"></canvas>
+                <div id="game-over">
+                    <h2>GAME OVER</h2>
+                    <p>SCORE: <span id="final-score">0</span></p>
+                    <button id="restart-btn">RETRY</button>
+                </div>
             </div>
 
-             <div class="side-panel" id="panel-next">
-                <div class="panel-label">NEXT</div>
-                <canvas id="next" width="60" height="180"></canvas>
-            </div>
-
-            <div id="game-over">
-                <h2>GAME OVER</h2>
-                <p>Final Score</p>
-                <p><span id="final-score">0</span></p>
-                <button id="restart-btn">PLAY AGAIN</button>
+            <div class="side-col right-col">
+                <div class="panel-box" style="height: 250px;">
+                    <div class="label">NEXT</div>
+                    <canvas id="next"></canvas>
+                </div>
             </div>
         </div>
 
         <div id="controls">
-            <div class="controls-top">
-                <div class="btn" id="btn-hold">HOLD</div>
-                <div class="btn" id="btn-hard">HARD</div>
-            </div>
-            <div class="controls-bottom">
-                <div class="d-pad">
-                    <div class="btn" id="btn-left">
-                        <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-                    </div>
-                    <div class="btn" id="btn-down">
-                        <svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
-                    </div>
-                    <div class="btn" id="btn-right">
-                        <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
-                    </div>
+            <div id="btn-hold-touch">HOLD</div> <div class="d-pad">
+                <div class="btn" id="btn-up">
+                    <svg viewBox="0 0 24 24"><path d="M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z"/><path d="M0 0h24v24H0z" fill="none"/></svg>
                 </div>
-                <div class="action-pad">
-                    <div class="btn" id="btn-rot">
-                        <svg viewBox="0 0 24 24"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>
-                    </div>
+                <div class="btn" id="btn-left">
+                    <svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+                </div>
+                <div class="btn" id="btn-down">
+                    <svg viewBox="0 0 24 24"><path d="M16.59 8.59L12 13.17 7.41 8.59 6 10l6 6 6-6z"/></svg>
+                </div>
+                <div class="btn" id="btn-right">
+                    <svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg>
+                </div>
+            </div>
+
+            <div class="action-area">
+                <div class="btn" id="btn-rot">
+                    <svg viewBox="0 0 24 24"><path d="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z"/></svg>
                 </div>
             </div>
         </div>
@@ -332,89 +304,116 @@
 
 <script>
 /* =========================================
-   テトリスのコアロジック (変更なし)
+   CORE LOGIC - FIXED & OPTIMIZED
 ========================================= */
-// 定数定義
 const COLS = 10;
 const ROWS = 20;
-let BLOCK_SIZE = 20; // 後で動的に計算
+let BLOCK_SIZE = 20;
 
+// ★修正点: オブジェクトごとに色を固定 (SRS準拠)
+// null, T, O, S, Z, J, L, I
 const COLORS = [
-    null, '#FF0D72', '#0DC2FF', '#0DFF72', '#F538FF', '#FF8E0D', '#FFE138', '#3877FF'
+    null,
+    '#a000f0', // T: Purple
+    '#f0f000', // O: Yellow
+    '#00f000', // S: Green
+    '#f00000', // Z: Red
+    '#0000f0', // J: Blue
+    '#f0a000', // L: Orange
+    '#00f0f0'  // I: Cyan
 ];
+
+// 形状定義
 const PIECES = [
     [],
-    [[[1, 1, 1],[0, 1, 0]], 1], // T
-    [[[2, 2],[2, 2]], 2],       // O
-    [[[0, 3, 3],[3, 3, 0]], 3], // S
-    [[[4, 4, 0],[0, 4, 4]], 4], // Z
-    [[[5, 0, 0],[5, 5, 5]], 5], // J
-    [[[0, 0, 6],[6, 6, 6]], 6], // L
-    [[[0, 0, 0, 0],[7, 7, 7, 7],[0, 0, 0, 0],[0, 0, 0, 0]], 7] // I
+    [[[0, 1, 0],[1, 1, 1],[0, 0, 0]], 1], // T (3x3)
+    [[[2, 2],[2, 2]], 2],                 // O (2x2)
+    [[[0, 3, 3],[3, 3, 0],[0, 0, 0]], 3], // S (3x3)
+    [[[4, 4, 0],[0, 4, 4],[0, 0, 0]], 4], // Z (3x3)
+    [[[5, 0, 0],[5, 5, 5],[0, 0, 0]], 5], // J (3x3)
+    [[[0, 0, 6],[6, 6, 6],[0, 0, 0]], 6], // L (3x3)
+    [[[0, 0, 0, 0],[7, 7, 7, 7],[0, 0, 0, 0],[0, 0, 0, 0]], 7] // I (4x4)
 ];
 
-// ゲーム状態
-let grid, score, lines, level, gameOver, dropCounter, dropInterval, lastTime, animationId;
-let player = { pos: {x: 0, y: 0}, matrix: null, colorIdx: 0 };
-let holdPiece = null; let canHold = true;
-let nextPieces = []; const NEXT_COUNT = 3;
+// Game State
+let grid;
+let score = 0, lines = 0, level = 1;
+let gameOver = false;
+let dropCounter = 0;
+let dropInterval = 1000;
+let lastTime = 0;
+let animationId = null;
 
-// DOM要素取得
+let player = { pos: {x: 0, y: 0}, matrix: null, colorIdx: 0, typeIdx: 0 };
+let holdPiece = null;
+let canHold = true;
+let nextPieces = [];
+const NEXT_COUNT = 3;
+
+// Canvas setup
 const canvas = document.getElementById('tetris');
 const ctx = canvas.getContext('2d');
 const nextCanvas = document.getElementById('next');
 const nextCtx = nextCanvas.getContext('2d');
 const holdCanvas = document.getElementById('hold');
 const holdCtx = holdCanvas.getContext('2d');
-const scoreEl = document.getElementById('score');
-const levelEl = document.getElementById('level');
-const linesEl = document.getElementById('lines');
-const gameOverEl = document.getElementById('game-over');
-const finalScoreEl = document.getElementById('final-score');
-const restartBtn = document.getElementById('restart-btn');
 
-/* --- 初期化とリサイズ処理 (★重要修正点) --- */
+// --- Initialization ---
 
 function init() {
+    // 画面サイズ計算
     const mainArea = document.getElementById('main-area');
-    // パディングなどを除いた実質的な利用可能エリアを取得
-    const availW = mainArea.clientWidth - 40; // 左右のパネル+余白分を引く
-    const availH = mainArea.clientHeight - 40; // 上下の余白分を引く
+    // パネル分(70px * 2)とパディングを引いた幅を基準にする
+    const availW = mainArea.clientWidth - 160; 
+    const availH = mainArea.clientHeight - 20;
 
-    // 幅と高さ、どちらの制約が厳しいかに合わせてブロックサイズを決定
-    const sizeByWidth = Math.floor(availW / COLS);
-    const sizeByHeight = Math.floor(availH / ROWS);
-    BLOCK_SIZE = Math.min(sizeByWidth, sizeByHeight);
+    const sizeByW = Math.floor(availW / COLS);
+    const sizeByH = Math.floor(availH / ROWS);
+    BLOCK_SIZE = Math.min(sizeByW, sizeByH);
 
-    // キャンバスサイズ設定
     canvas.width = BLOCK_SIZE * COLS;
     canvas.height = BLOCK_SIZE * ROWS;
 
-    // サブキャンバスのスケール設定
-    const subScale = BLOCK_SIZE * 0.7;
-    // コンテキストをリセットしてからスケール設定
+    // Side canvas scaling
+    const subBlock = 15; // 固定サイズで見やすく
+    nextCanvas.width = subBlock * 5;
+    nextCanvas.height = subBlock * 15;
+    holdCanvas.width = subBlock * 5;
+    holdCanvas.height = subBlock * 5;
+    
+    // スケールリセット
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     nextCtx.setTransform(1, 0, 0, 1, 0, 0);
     holdCtx.setTransform(1, 0, 0, 1, 0, 0);
-    nextCtx.scale(subScale, subScale);
-    holdCtx.scale(subScale, subScale);
     
+    // ゲーム用スケール
+    nextCtx.scale(subBlock, subBlock);
+    holdCtx.scale(subBlock, subBlock);
+    ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
+
     resetGame();
 }
 
 function resetGame() {
     grid = createGrid(COLS, ROWS);
     score = 0; lines = 0; level = 1;
-    gameOver = false; dropInterval = 1000;
+    dropInterval = 1000;
+    gameOver = false;
     holdPiece = null; canHold = true;
     nextPieces = [];
     
-    updateScore();
-    gameOverEl.style.display = 'none';
+    document.getElementById('game-over').style.display = 'none';
+    updateStats();
+
+    // Fill NEXT
+    for(let i=0; i<NEXT_COUNT+1; i++) nextPieces.push(createPiece());
     
-    for(let i=0; i< NEXT_COUNT + 1; i++) nextPieces.push(createPiece());
     playerReset();
+    
+    // ★修正点: 時間管理を performance.now() でリセット
     if (animationId) cancelAnimationFrame(animationId);
-    lastTime = performance.now(); // 時間をリセット
+    lastTime = performance.now();
+    dropCounter = 0;
     gameLoop(lastTime);
 }
 
@@ -422,209 +421,313 @@ function createGrid(w, h) {
     return Array.from({length: h}, () => Array(w).fill(0));
 }
 
-/* --- ゲームループ (変更なし) --- */
+// --- Game Loop (★修正: 自動落下ロジック修正) ---
+
 function gameLoop(time = 0) {
     if (gameOver) return;
+
     const deltaTime = time - lastTime;
     lastTime = time;
+
     dropCounter += deltaTime;
-    if (dropCounter > dropInterval) playerDrop();
+    
+    // 一定時間経過で落下
+    if (dropCounter > dropInterval) {
+        playerDrop();
+    }
+
     draw();
     animationId = requestAnimationFrame(gameLoop);
 }
 
-/* --- 描画処理 (一部調整) --- */
-function draw() {
-    // メインキャンバスの描画
-    ctx.setTransform(1, 0, 0, 1, 0, 0); // リセット
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'; // 背景を少し透過させてリッチに
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.scale(BLOCK_SIZE, BLOCK_SIZE); // スケール適用
+// --- Drawing ---
 
+function draw() {
+    // Clear
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, COLS, ROWS); // scaleが効いているのでこの指定でOK
+
+    // Board
     drawMatrix(grid, {x: 0, y: 0}, ctx);
-    
-    // ゴースト
+
+    // Ghost (落下予測)
     let ghostPos = { ...player.pos };
-    while (!collide(grid, { pos: ghostPos, matrix: player.matrix })) ghostPos.y++;
-    ghostPos.y--;
+    while (!collide(grid, { pos: ghostPos, matrix: player.matrix })) {
+        ghostPos.y++;
+    }
+    ghostPos.y--; // 衝突直前
+    
     ctx.globalAlpha = 0.2;
     drawMatrix(player.matrix, ghostPos, ctx, player.colorIdx);
     ctx.globalAlpha = 1.0;
 
+    // Player
     drawMatrix(player.matrix, player.pos, ctx, player.colorIdx);
-    drawSidePanels();
+
+    // Side Panels
+    drawSides();
 }
 
 function drawMatrix(matrix, offset, context, colorIdxOverride = null) {
     matrix.forEach((row, y) => {
         row.forEach((value, x) => {
-            const colorIndex = colorIdxOverride !== null ? (value ? colorIdxOverride : 0) : value;
-            if (colorIndex !== 0) {
-                const color = COLORS[colorIndex];
-                // ブロックの本体
+            const idx = colorIdxOverride !== null ? (value ? colorIdxOverride : 0) : value;
+            if (idx !== 0) {
+                const color = COLORS[idx];
+                
+                // ブロック本体
                 context.fillStyle = color;
                 context.fillRect(x + offset.x, y + offset.y, 1, 1);
-                
-                // リッチな立体表現 (光と影)
+
+                // 立体感 (Bevel)
                 context.lineWidth = 0.05;
                 context.strokeStyle = 'rgba(255,255,255,0.5)';
-                context.beginPath();
-                context.moveTo(x + offset.x, y + offset.y + 1);
-                context.lineTo(x + offset.x, y + offset.y);
-                context.lineTo(x + offset.x + 1, y + offset.y);
-                context.stroke();
-                
-                context.strokeStyle = 'rgba(0,0,0,0.3)';
-                context.beginPath();
-                context.moveTo(x + offset.x + 1, y + offset.y);
-                context.lineTo(x + offset.x + 1, y + offset.y + 1);
-                context.lineTo(x + offset.x, y + offset.y + 1);
-                context.stroke();
+                context.strokeRect(x + offset.x, y + offset.y, 1, 1);
+
+                // 内側の輝き
+                context.fillStyle = 'rgba(255,255,255,0.1)';
+                context.fillRect(x + offset.x + 0.2, y + offset.y + 0.2, 0.6, 0.6);
             }
         });
     });
 }
 
-function drawSidePanels() {
-    // NEXT
-    nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
-    let yOffset = 0.5;
+function drawSides() {
+    // Clear
+    nextCtx.clearRect(0,0,10,20);
+    holdCtx.clearRect(0,0,10,10);
+
+    // Draw NEXT
+    let yOff = 0.5;
     for(let i=0; i<NEXT_COUNT; i++) {
-        const piece = nextPieces[i];
-        // 中央揃えの計算
-        const xOffset = (4 - piece.matrix[0].length) / 2;
-        drawMatrix(piece.matrix, {x: xOffset, y: yOffset}, nextCtx, piece.colorIdx);
-        yOffset += piece.matrix.length + 0.5;
+        const p = nextPieces[i];
+        const xOff = (5 - p.matrix[0].length) / 2;
+        drawMatrix(p.matrix, {x: xOff, y: yOff}, nextCtx, p.colorIdx);
+        yOff += p.matrix.length + 0.5;
     }
-    // HOLD
-    holdCtx.clearRect(0, 0, holdCanvas.width, holdCanvas.height);
+
+    // Draw HOLD
     if (holdPiece) {
-        const xOffset = (4 - holdPiece.matrix[0].length) / 2;
-        const yOffset = (4 - holdPiece.matrix.length) / 2;
-        drawMatrix(holdPiece.matrix, {x: xOffset, y: yOffset}, holdCtx, holdPiece.colorIdx);
+        const xOff = (5 - holdPiece.matrix[0].length) / 2;
+        const yOff = (5 - holdPiece.matrix.length) / 2;
+        drawMatrix(holdPiece.matrix, {x: xOff, y: yOff}, holdCtx, holdPiece.colorIdx);
     }
 }
 
-/* --- プレイヤー操作ロジック (変更なし) --- */
+// --- Logic ---
+
 function createPiece() {
-    const pieceIdx = (Math.random() * 7 | 0) + 1;
-    const pieceData = PIECES[pieceIdx];
-    return { matrix: pieceData[0], colorIdx: pieceData[1], typeIdx: pieceIdx };
+    const idx = (Math.random() * 7 | 0) + 1;
+    const data = PIECES[idx];
+    
+    // ★修正点: 配列のディープコピーを作成して返す
+    // これにより回転させても元データ(PIECES)が書き換わらない！
+    const matrix = data[0].map(row => [...row]);
+    
+    return {
+        matrix: matrix,
+        colorIdx: data[1],
+        typeIdx: idx
+    };
 }
+
 function playerReset() {
     const next = nextPieces.shift();
-    player.matrix = next.matrix; player.colorIdx = next.colorIdx; player.typeIdx = next.typeIdx;
+    player.matrix = next.matrix; // ここは既にコピーされているのでOK
+    player.colorIdx = next.colorIdx;
+    player.typeIdx = next.typeIdx;
+    
     nextPieces.push(createPiece());
+
     player.pos.y = 0;
     player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
+    
     canHold = true;
+
     if (collide(grid, player)) {
         gameOver = true;
-        cancelAnimationFrame(animationId);
-        finalScoreEl.textContent = score;
-        gameOverEl.style.display = 'block';
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('game-over').style.display = 'block';
     }
 }
+
 function playerDrop() {
     player.pos.y++;
     if (collide(grid, player)) {
-        player.pos.y--; merge(grid, player); playerReset(); arenaSweep(); updateScore();
+        player.pos.y--;
+        merge(grid, player);
+        playerReset();
+        arenaSweep();
+        dropCounter = 0; // リセット
     }
     dropCounter = 0;
 }
+
+// ハードドロップ（一瞬で底まで）
+function playerHardDrop() {
+    while (!collide(grid, player)) {
+        player.pos.y++;
+    }
+    player.pos.y--;
+    merge(grid, player);
+    playerReset();
+    arenaSweep();
+    dropCounter = 0;
+}
+
 function playerMove(dir) {
     player.pos.x += dir;
-    if (collide(grid, player)) player.pos.x -= dir;
+    if (collide(grid, player)) {
+        player.pos.x -= dir;
+    }
 }
+
 function playerRotate(dir) {
-    const pos = player.pos.x; let offset = 1;
+    const pos = player.pos.x;
+    let offset = 1;
     rotate(player.matrix, dir);
+    // Wall kick (simple)
     while (collide(grid, player)) {
-        player.pos.x += offset; offset = -(offset + (offset > 0 ? 1 : -1));
+        player.pos.x += offset;
+        offset = -(offset + (offset > 0 ? 1 : -1));
         if (offset > player.matrix[0].length) {
-            rotate(player.matrix, -dir); player.pos.x = pos; return;
+            rotate(player.matrix, -dir);
+            player.pos.x = pos;
+            return;
         }
     }
 }
+
+// ★修正点: 行列回転ロジックの適正化
 function rotate(matrix, dir) {
     for (let y = 0; y < matrix.length; ++y) {
-        for (let x = 0; x < y; ++x) [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        for (let x = 0; x < y; ++x) {
+            [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
     }
-    if (dir > 0) matrix.forEach(row => row.reverse()); else matrix.reverse();
+    if (dir > 0) {
+        matrix.forEach(row => row.reverse());
+    } else {
+        matrix.reverse();
+    }
 }
-function playerHardDrop() {
-    while (!collide(grid, player)) player.pos.y++;
-    player.pos.y--; merge(grid, player); playerReset(); arenaSweep(); updateScore(); dropCounter = 0;
-}
+
 function playerHold() {
     if (!canHold) return;
-    const current = { matrix: player.matrix, colorIdx: player.colorIdx, typeIdx: player.typeIdx };
-    if (holdPiece === null) { holdPiece = current; playerReset(); }
-    else {
-        const temp = holdPiece; holdPiece = current;
-        player.matrix = temp.matrix; player.colorIdx = temp.colorIdx; player.typeIdx = temp.typeIdx;
-        player.pos.y = 0; player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
+    
+    const current = {
+        matrix: player.matrix, // 参照でOK（入れ替えるだけなので）
+        colorIdx: player.colorIdx,
+        typeIdx: player.typeIdx
+    };
+
+    if (holdPiece === null) {
+        holdPiece = current;
+        playerReset();
+    } else {
+        const temp = holdPiece;
+        holdPiece = current;
+        player.matrix = temp.matrix;
+        player.colorIdx = temp.colorIdx;
+        player.typeIdx = temp.typeIdx;
+        // Reset pos
+        player.pos.y = 0;
+        player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
     }
     canHold = false;
 }
 
-/* --- ゲームメカニクス (変更なし) --- */
 function collide(arena, player) {
     const [m, o] = [player.matrix, player.pos];
     for (let y = 0; y < m.length; ++y) {
         for (let x = 0; x < m[y].length; ++x) {
-            if (m[y][x] !== 0 && (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) return true;
+            if (m[y][x] !== 0 &&
+               (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                return true;
+            }
         }
     }
     return false;
 }
+
 function merge(arena, player) {
-    player.matrix.forEach((row, y) => row.forEach((value, x) => {
-        if (value !== 0) arena[y + player.pos.y][x + player.pos.x] = player.colorIdx;
-    }));
+    player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                arena[y + player.pos.y][x + player.pos.x] = player.colorIdx;
+            }
+        });
+    });
 }
+
 function arenaSweep() {
     let rowCount = 0;
     outer: for (let y = grid.length - 1; y > 0; --y) {
-        for (let x = 0; x < grid[y].length; ++x) { if (grid[y][x] === 0) continue outer; }
-        const row = grid.splice(y, 1)[0].fill(0); grid.unshift(row); ++y; rowCount++;
+        for (let x = 0; x < grid[y].length; ++x) {
+            if (grid[y][x] === 0) continue outer;
+        }
+        const row = grid.splice(y, 1)[0].fill(0);
+        grid.unshift(row);
+        ++y;
+        rowCount++;
     }
     if (rowCount > 0) {
         lines += rowCount;
-        score += rowCount * 100 * level * (rowCount > 1 ? rowCount * 1.5 : 1); // ボーナス強化
+        score += rowCount * 100 * level;
         level = Math.floor(lines / 10) + 1;
-        dropInterval = Math.max(100, 1000 - (level - 1) * 100);
+        dropInterval = Math.max(100, 1000 - (level - 1) * 50);
+        updateStats();
     }
 }
-function updateScore() {
-    scoreEl.innerText = score; levelEl.innerText = level; linesEl.innerText = lines;
+
+function updateStats() {
+    document.getElementById('score').innerText = score;
+    document.getElementById('level').innerText = level;
+    document.getElementById('lines').innerText = lines;
 }
 
-/* --- 入力イベントハンドリング --- */
-function setupTouchButton(id, action) {
+// --- Controls ---
+
+function setupBtn(id, action) {
     const btn = document.getElementById(id);
     btn.addEventListener('touchstart', (e) => {
-        e.preventDefault(); if (!gameOver) action();
+        e.preventDefault();
+        if (!gameOver) action();
     }, { passive: false });
+    // PC Debug
+    btn.addEventListener('mousedown', (e) => {
+        if (!gameOver) action();
+    });
 }
-setupTouchButton('btn-left', () => playerMove(-1));
-setupTouchButton('btn-right', () => playerMove(1));
-setupTouchButton('btn-down', () => playerDrop());
-setupTouchButton('btn-rot', () => playerRotate(1));
-setupTouchButton('btn-hard', () => playerHardDrop());
-setupTouchButton('btn-hold', () => playerHold());
 
-restartBtn.addEventListener('touchstart', resetGame);
-restartBtn.addEventListener('click', resetGame);
+setupBtn('btn-left', () => playerMove(-1));
+setupBtn('btn-right', () => playerMove(1));
+setupBtn('btn-down', () => playerDrop());
+setupBtn('btn-up', () => playerHardDrop()); // ★修正: 上キーでハードドロップ
+setupBtn('btn-rot', () => playerRotate(1));
+setupBtn('btn-hold-touch', () => playerHold());
 
-// 初期化実行とリサイズ対応
+document.getElementById('restart-btn').addEventListener('click', resetGame);
+document.getElementById('restart-btn').addEventListener('touchstart', resetGame);
+
+// PC Key controls
+document.addEventListener('keydown', event => {
+    if (gameOver) return;
+    switch(event.keyCode) {
+        case 37: playerMove(-1); break;
+        case 39: playerMove(1); break;
+        case 40: playerDrop(); break;
+        case 38: playerHardDrop(); break; // Up arrow
+        case 88: playerRotate(1); break; // X key
+        case 16: playerHold(); break;     // Shift
+    }
+});
+
+// Start
 window.addEventListener('load', init);
 window.addEventListener('resize', () => {
-    // リサイズ時にゲームをリセットせずにサイズだけ合わせる簡易実装
-    if (!gameOver) init(); 
+   if(!gameOver) init();
 });
-// 初回起動用（loadイベントが発火しない場合への保険）
-if (document.readyState === 'complete') init();
 
 </script>
 </body>
