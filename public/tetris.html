@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gravity Perfect Tetris</title>
+    <style>
+        /* 基本設定 */
+        :root {
+            --bg-color: #111;
+            --text-color: #eee;
+            --accent-color: cyan;
+            --button-bg: rgba(255, 255, 255, 0.15);
+            --button-active: rgba(255, 255, 255, 0.3);
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Roboto Mono', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh; /* 画面いっぱいに使う */
+            overflow: hidden; /* スクロール禁止 */
+            touch-action: none; /* ブラウザ標準のタッチ動作を無効化 */
+        }
+
+        /* レイアウトコンテナ */
+        #game-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+            max-width: 500px; /* タブレットなどで広がりすぎないように */
+        }
+
+        /* ヘッダー (スコア等) */
+        header {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 0;
+            background: rgba(0,0,0,0.5);
+            font-size: 14px;
+        }
+        .stat-box span {
+            display: block;
+            font-size: 18px;
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+
+        /* メインゲーム画面エリア */
+        #main-area {
+            flex: 1; /* 残りのスペースを埋める */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px;
+            position: relative;
+        }
+
+        canvas {
+            background: #000;
+            border: 2px solid #333;
+            border-radius: 4px;
+        }
+
+        /* サイドパネル (Hold/Next) */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+        .panel-label {
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        /* ゲームオーバー表示 */
+        #game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.85);
+            padding: 20px;
+            border: 2px solid var(--accent-color);
+            text-align: center;
+            z-index: 10;
+            display: none; /* 初期は非表示 */
+        }
+        #game-over h2 { margin-top: 0; color: red; }
+        #restart-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: var(--accent-color);
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        /* コントローラーエリア */
+        #controls {
+            height: 200px; /* コントローラーの高さ */
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 5px;
+            padding: 5px;
+            background: rgba(0,0,0,0.3);
+        }
+
+        /* ボタンのスタイル */
+        .btn {
+            background: var(--button-bg);
+            border: 1px solid #444;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            user-select: none; /* テキスト選択禁止 */
+            -webkit-tap-highlight-color: transparent; /* タップ時のハイライトを消す */
+        }
+        .btn:active {
+            background: var(--button-active);
+        }
+        /* ボタンの配置調整 */
+        #btn-hold { grid-area: 1 / 1 / 2 / 2; font-size: 16px; font-weight:bold; color:orange;}
+        #btn-hard { grid-area: 1 / 2 / 2 / 3; font-size: 16px; font-weight:bold; color:cyan;}
+        #btn-rot  { grid-area: 1 / 3 / 3 / 5; font-size: 40px; background: rgba(0, 255, 255, 0.1);} /* 回転は大きく */
+        #btn-left { grid-area: 2 / 1 / 3 / 2; }
+        #btn-down { grid-area: 2 / 2 / 3 / 3; }
+        #btn-right { grid-area: 2 / 3 / 3 / 4; }
+
+    </style>
+</head>
+<body>
+    <div id="game-wrapper">
+        <header>
+            <div class="stat-box">SCORE <span id="score">0</span></div>
+            <div class="stat-box">LEVEL <span id="level">1</span></div>
+            <div class="stat-box">LINES <span id="lines">0</span></div>
+        </header>
+
+        <div id="main-area">
+            <div class="side-panel">
+                <div class="panel-label">HOLD</div>
+                <canvas id="hold" width="60" height="60"></canvas>
+            </div>
+
+            <canvas id="tetris" width="200" height="400"></canvas>
+
+             <div class="side-panel">
+                <div class="panel-label">NEXT</div>
+                <canvas id="next" width="60" height="180"></canvas>
+            </div>
+
+            <div id="game-over">
+                <h2>GAME OVER</h2>
+                <p>Score: <span id="final-score">0</span></p>
+                <button id="restart-btn">RESTART</button>
+            </div>
+        </div>
+
+        <div id="controls">
+            <div class="btn" id="btn-hold">HOLD</div>
+            <div class="btn" id="btn-hard">HARD</div>
+            <div class="btn" id="btn-rot">↻</div>
+            <div class="btn" id="btn-left">←</div>
+            <div class="btn" id="btn-down">↓</div>
+            <div class="btn" id="btn-right">→</div>
+        </div>
+    </div>
+
+<script>
+/* =========================================
+   テトリスのコアロジック
+========================================= */
+
+// 定数定義
+const COLS = 10;
+const ROWS = 20;
+let BLOCK_SIZE = 20; // 画面サイズに合わせて後で計算
+
+const COLORS = [
+    null,
+    '#FF0D72', // T (Magenta)
+    '#0DC2FF', // O (Cyan)
+    '#0DFF72', // S (Green)
+    '#F538FF', // Z (Purple)
+    '#FF8E0D', // J (Orange)
+    '#FFE138', // L (Yellow)
+    '#3877FF'  // I (Blue)
+];
+
+// テトロミノの形状定義 (SRS準拠のつもりだが簡易版)
+const PIECES = [
+    [], // 0番目は空
+    [[[1, 1, 1],[0, 1, 0]], 1], // T
+    [[[2, 2],[2, 2]], 2],       // O
+    [[[0, 3, 3],[3, 3, 0]], 3], // S
+    [[[4, 4, 0],[0, 4, 4]], 4], // Z
+    [[[5, 0, 0],[5, 5, 5]], 5], // J
+    [[[0, 0, 6],[6, 6, 6]], 6], // L
+    [[[0, 0, 0, 0],[7, 7, 7, 7],[0, 0, 0, 0],[0, 0, 0, 0]], 7] // I
+];
+
+// ゲームの状態管理
+let grid = createGrid(COLS, ROWS);
+let score = 0;
+let lines = 0;
+let level = 1;
+let gameOver = false;
+let dropCounter = 0;
+let dropInterval = 1000; // 初期の落下速度(ms)
+let lastTime = 0;
+let animationId = null;
+
+let player = { pos: {x: 0, y: 0}, matrix: null, colorIdx: 0 };
+let holdPiece = null;
+let canHold = true;
+let nextPieces = [];
+const NEXT_COUNT = 3; // NEXTの表示数
+
+// Canvas要素の取得とコンテキスト設定
+const canvas = document.getElementById('tetris');
+const ctx = canvas.getContext('2d');
+const nextCanvas = document.getElementById('next');
+const nextCtx = nextCanvas.getContext('2d');
+const holdCanvas = document.getElementById('hold');
+const holdCtx = holdCanvas.getContext('2d');
+
+// DOM要素の取得
+const scoreEl = document.getElementById('score');
+const levelEl = document.getElementById('level');
+const linesEl = document.getElementById('lines');
+const gameOverEl = document.getElementById('game-over');
+const finalScoreEl = document.getElementById('final-score');
+const restartBtn = document.getElementById('restart-btn');
+
+
+/* --- 初期化とリサイズ処理 --- */
+
+function init() {
+    // 画面サイズに合わせてCanvasサイズを調整
+    const mainArea = document.getElementById('main-area');
+    // 利用可能な高さの80%をゲーム画面に割り当てる計算
+    const availableHeight = mainArea.clientHeight * 0.95;
+    BLOCK_SIZE = Math.floor(availableHeight / ROWS);
+
+    // メインCanvasサイズ設定
+    canvas.width = BLOCK_SIZE * COLS;
+    canvas.height = BLOCK_SIZE * ROWS;
+
+    // サブCanvasのスケール調整
+    const subScale = BLOCK_SIZE * 0.8; // 少し小さく表示
+    nextCtx.scale(subScale, subScale);
+    holdCtx.scale(subScale, subScale);
+    ctx.scale(BLOCK_SIZE, BLOCK_SIZE);
+    
+    resetGame();
+}
+
+function resetGame() {
+    grid = createGrid(COLS, ROWS);
+    score = 0;
+    lines = 0;
+    level = 1;
+    gameOver = false;
+    dropInterval = 1000;
+    holdPiece = null;
+    canHold = true;
+    nextPieces = [];
+    
+    updateScore();
+    gameOverEl.style.display = 'none';
+    
+    // NEXTピースの補充
+    for(let i=0; i< NEXT_COUNT + 1; i++) {
+        nextPieces.push(createPiece());
+    }
+
+    playerReset();
+    if (animationId) cancelAnimationFrame(animationId);
+    gameLoop();
+}
+
+// 2次元配列のグリッドを作成
+function createGrid(w, h) {
+    return Array.from({length: h}, () => Array(w).fill(0));
+}
+
+/* --- ゲームループ --- */
+
+function gameLoop(time = 0) {
+    if (gameOver) return;
+
+    const deltaTime = time - lastTime;
+    lastTime = time;
+
+    dropCounter += deltaTime;
+    if (dropCounter > dropInterval) {
+        playerDrop();
+    }
+
+    draw();
+    animationId = requestAnimationFrame(gameLoop);
+}
+
+
+/* --- 描画処理 --- */
+
+function draw() {
+    // 画面クリア
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // グリッドの描画
+    drawMatrix(grid, {x: 0, y: 0}, ctx);
+    
+    // ゴースト（落下予測地点）の計算と描画
+    let ghostPos = { ...player.pos };
+    while (!collide(grid, { pos: ghostPos, matrix: player.matrix })) {
+        ghostPos.y++;
+    }
+    ghostPos.y--; // 衝突した1つ上が設置場所
+    
+    // ゴーストは薄く描画
+    ctx.globalAlpha = 0.3;
+    drawMatrix(player.matrix, ghostPos, ctx, player.colorIdx);
+    ctx.globalAlpha = 1.0;
+
+    // 操作中のピース描画
+    drawMatrix(player.matrix, player.pos, ctx, player.colorIdx);
+
+    // NEXTとHOLDの描画
+    drawSidePanels();
+}
+
+function drawMatrix(matrix, offset, context, colorIdxOverride = null) {
+    matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            // グリッドの値(value)または上書き色(colorIdxOverride)を使う
+            const colorIndex = colorIdxOverride !== null ? (value ? colorIdxOverride : 0) : value;
+            if (colorIndex !== 0) {
+                // ブロックの描画（少し立体的に見えるように枠線を付ける）
+                context.fillStyle = COLORS[colorIndex];
+                context.fillRect(x + offset.x, y + offset.y, 1, 1);
+                
+                context.lineWidth = 0.05;
+                context.strokeStyle = 'rgba(255,255,255,0.4)';
+                context.strokeRect(x + offset.x, y + offset.y, 1, 1);
+            }
+        });
+    });
+}
+
+function drawSidePanels() {
+    // NEXT描画
+    nextCtx.fillStyle = '#000';
+    nextCtx.fillRect(0, 0, nextCanvas.width / (BLOCK_SIZE*0.8), nextCanvas.height / (BLOCK_SIZE*0.8));
+    let yOffset = 1;
+    for(let i=0; i<NEXT_COUNT; i++) {
+        const piece = nextPieces[i];
+        drawMatrix(piece.matrix, {x: 1, y: yOffset}, nextCtx, piece.colorIdx);
+        yOffset += piece.matrix.length + 1;
+    }
+
+    // HOLD描画
+    holdCtx.fillStyle = '#000';
+    holdCtx.fillRect(0, 0, holdCanvas.width, holdCanvas.height);
+    if (holdPiece) {
+        drawMatrix(holdPiece.matrix, {x: 1, y: 1}, holdCtx, holdPiece.colorIdx);
+    }
+}
+
+
+/* --- プレイヤー操作ロジック --- */
+
+function createPiece() {
+    // 7種類のピースからランダムに選択（簡単な実装）
+    const pieceIdx = (Math.random() * 7 | 0) + 1;
+    const pieceData = PIECES[pieceIdx];
+    return {
+        matrix: pieceData[0],
+        colorIdx: pieceData[1],
+        typeIdx: pieceIdx
+    };
+}
+
+function playerReset() {
+    // NEXTから次のピースを取り出す
+    const next = nextPieces.shift();
+    player.matrix = next.matrix;
+    player.colorIdx = next.colorIdx;
+    player.typeIdx = next.typeIdx;
+    
+    // 新しいピースをNEXTの末尾に追加
+    nextPieces.push(createPiece());
+
+    // 出現位置（中央上部）
+    player.pos.y = 0;
+    player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
+    
+    canHold = true; // ホールド権復活
+
+    // 出現時点で衝突＝ゲームオーバー
+    if (collide(grid, player)) {
+        gameOver = true;
+        cancelAnimationFrame(animationId);
+        finalScoreEl.textContent = score;
+        gameOverEl.style.display = 'block';
+    }
+}
+
+function playerDrop() {
+    player.pos.y++;
+    if (collide(grid, player)) {
+        player.pos.y--;
+        merge(grid, player);
+        playerReset();
+        arenaSweep();
+        updateScore();
+    }
+    dropCounter = 0;
+}
+
+function playerMove(dir) {
+    player.pos.x += dir;
+    if (collide(grid, player)) {
+        player.pos.x -= dir;
+    }
+}
+
+function playerRotate(dir) {
+    const pos = player.pos.x;
+    let offset = 1;
+    rotate(player.matrix, dir);
+    // 回転後の衝突判定（簡易的なウォールキック実装）
+    while (collide(grid, player)) {
+        player.pos.x += offset;
+        offset = -(offset + (offset > 0 ? 1 : -1));
+        if (offset > player.matrix[0].length) {
+            // 回転できない場合は元に戻す
+            rotate(player.matrix, -dir);
+            player.pos.x = pos;
+            return;
+        }
+    }
+}
+
+function rotate(matrix, dir) {
+    // 行列の転置＋反転で回転を実現
+    for (let y = 0; y < matrix.length; ++y) {
+        for (let x = 0; x < y; ++x) {
+            [matrix[x][y], matrix[y][x]] = [matrix[y][x], matrix[x][y]];
+        }
+    }
+    if (dir > 0) matrix.forEach(row => row.reverse());
+    else matrix.reverse();
+}
+
+function playerHardDrop() {
+    while (!collide(grid, player)) {
+        player.pos.y++;
+    }
+    player.pos.y--;
+    merge(grid, player);
+    playerReset();
+    arenaSweep();
+    updateScore();
+    dropCounter = 0;
+}
+
+function playerHold() {
+    if (!canHold) return;
+    
+    const currentPieceInfo = {
+        matrix: player.matrix,
+        colorIdx: player.colorIdx,
+        typeIdx: player.typeIdx
+    };
+
+    if (holdPiece === null) {
+        holdPiece = currentPieceInfo;
+        playerReset();
+    } else {
+        const temp = holdPiece;
+        holdPiece = currentPieceInfo;
+        player.matrix = temp.matrix;
+        player.colorIdx = temp.colorIdx;
+        player.typeIdx = temp.typeIdx;
+        player.pos.y = 0;
+        player.pos.x = (COLS / 2 | 0) - (player.matrix[0].length / 2 | 0);
+    }
+    canHold = false; // ホールド使用済み
+}
+
+
+/* --- ゲームメカニクス --- */
+
+// 衝突判定
+function collide(arena, player) {
+    const [m, o] = [player.matrix, player.pos];
+    for (let y = 0; y < m.length; ++y) {
+        for (let x = 0; x < m[y].length; ++x) {
+            if (m[y][x] !== 0 &&
+                (arena[y + o.y] && arena[y + o.y][x + o.x]) !== 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// ピースをグリッドに固定
+function merge(arena, player) {
+    player.matrix.forEach((row, y) => {
+        row.forEach((value, x) => {
+            if (value !== 0) {
+                arena[y + player.pos.y][x + player.pos.x] = player.colorIdx;
+            }
+        });
+    });
+}
+
+// ライン消去とスコア計算
+function arenaSweep() {
+    let rowCount = 0;
+    outer: for (let y = grid.length - 1; y > 0; --y) {
+        for (let x = 0; x < grid[y].length; ++x) {
+            if (grid[y][x] === 0) {
+                continue outer;
+            }
+        }
+        // ラインが揃った場合
+        const row = grid.splice(y, 1)[0].fill(0);
+        grid.unshift(row);
+        ++y;
+        rowCount++;
+    }
+
+    if (rowCount > 0) {
+        lines += rowCount;
+        // スコア計算（適当な係数）
+        score += rowCount * 100 * level * (rowCount > 1 ? rowCount : 1);
+        // レベルアップ計算（10ラインごと）
+        level = Math.floor(lines / 10) + 1;
+        // 落下速度上昇
+        dropInterval = 1000 - (level - 1) * 100;
+        if (dropInterval < 100) dropInterval = 100; // 最速制限
+    }
+}
+
+function updateScore() {
+    scoreEl.innerText = score;
+    levelEl.innerText = level;
+    linesEl.innerText = lines;
+}
+
+
+/* --- 入力イベントハンドリング --- */
+
+// タッチボタンのイベント設定補助関数
+function setupTouchButton(id, action) {
+    const btn = document.getElementById(id);
+    // touchstartで反応させることで遅延をなくす
+    btn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // 長押しメニューなどを抑制
+        if (!gameOver) action();
+    }, { passive: false });
+    
+    // 連打対応（押しっぱなしではない）
+    if (id === 'btn-down' || id === 'btn-left' || id === 'btn-right') {
+        // 必要なら長押し移動をここに実装するが、今回は単発押しのみ
+    }
+}
+
+// 各ボタンへのアクション割り当て
+setupTouchButton('btn-left', () => playerMove(-1));
+setupTouchButton('btn-right', () => playerMove(1));
+setupTouchButton('btn-down', () => playerDrop());
+setupTouchButton('btn-rot', () => playerRotate(1));
+setupTouchButton('btn-hard', () => playerHardDrop());
+setupTouchButton('btn-hold', () => playerHold());
+
+// リスタートボタン
+restartBtn.addEventListener('click', resetGame);
+restartBtn.addEventListener('touchstart', resetGame);
+
+// キーボード操作（PCデバッグ用）
+document.addEventListener('keydown', event => {
+    if (gameOver) return;
+    switch (event.keyCode) {
+        case 37: playerMove(-1); break; // ←
+        case 39: playerMove(1); break; // →
+        case 40: playerDrop(); break; // ↓
+        case 38: playerRotate(1); break; // ↑
+        case 32: playerHardDrop(); break; // Space
+        case 16: playerHold(); break; // Shift
+    }
+});
+
+// 初期化実行（画像読み込み待ちなどがないので即実行）
+// 少し待ってから初期化（DOM配置安定待ち）
+setTimeout(init, 100);
+
+// 画面リサイズ対応
+window.addEventListener('resize', () => {
+    // リサイズ時は簡易的にリロードしてしまうのが安全
+    // location.reload();
+    // あるいはinitを再調整するが、今回は省略
+});
+
+</script>
+</body>
+</html>
