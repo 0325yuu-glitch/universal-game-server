@@ -1,7 +1,7 @@
 <html lang="ja"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大富豪オンライン Final Plus V10 (Fixed)</title>
+    <title>大富豪オンライン Final Plus V11 (Fixed Types)</title>
     <style>
         :root {
             --card-w: 72px; 
@@ -490,14 +490,16 @@
             playerNames=data.playerNames||[];
             totalPlayers=playerNames.length;
             
-            // 【修正】型変換 (String) を追加
+            // 【重要修正】サーバーから数字で来ても、強制的にString型に変換して保存する
             const myHand=(data.hand||[]).map(c => {
-                let val = RANKS.indexOf(String(c.r)); // ここでString変換
+                let rankStr = String(c.r); // 強制文字列化
+                let val = RANKS.indexOf(rankStr); 
+                
                 if(c.r === 'JK' || c.isJ) val = 99;
                 
                 return {
                     s: c.s,
-                    r: c.r,
+                    r: rankStr, // 文字列として保存 (これで送り返すときも文字列になる)
                     v: val, 
                     isJ: c.isJ || c.r === 'JK',
                     id: Math.random().toString(36),
@@ -532,7 +534,7 @@
             }else{
                 document.getElementById('myTurnLbl').style.opacity=0;
             }
-            console.log('✅ Online game started (Fixed v calculation)');
+            console.log('✅ Online game started (Fixed Types)');
             
         } catch(e) {
             console.error('❌',e.message);
@@ -548,13 +550,14 @@
     function handleTurnStart(data){turn=data.currentPlayer;isProcessing=false;if(turn===myPlayerNumber){document.getElementById('myTurnLbl').style.opacity=1;renderControls();}else{document.getElementById('myTurnLbl').style.opacity=0;document.getElementById('btnPlay').disabled=true;document.getElementById('btnPass').disabled=true;}}
     
     function handleCardsPlayed(data){
-        // 【修正】型変換 (String) を追加
+        // 【重要修正】ここでもString型に強制変換
         const playedCards = data.cards.map(c => {
-            let val = RANKS.indexOf(String(c.r)); // ここでString変換
+            let rankStr = String(c.r);
+            let val = RANKS.indexOf(rankStr);
             if(c.r === 'JK' || c.isJ) val = 99;
             return {
                 s: c.s,
-                r: c.r,
+                r: rankStr, // 文字列として保存
                 v: val,
                 isJ: c.isJ || c.r === 'JK'
             };
