@@ -1463,26 +1463,6 @@
             return closest;
         }
 
-        function splitPaletteString(paletteStr, maxSize) {
-            const chunks = [];
-            const entries = paletteStr.split(',').filter(s => s.length > 0);
-            let currentChunk = '';
-            
-            for (const entry of entries) {
-                const toAdd = currentChunk.length > 0 ? ',' + entry : entry;
-                if (currentChunk.length + toAdd.length + 1 > maxSize && currentChunk.length > 0) {
-                    chunks.push(currentChunk + ',');
-                    currentChunk = entry;
-                } else {
-                    currentChunk += toAdd;
-                }
-            }
-            if (currentChunk.length > 0) {
-                chunks.push(currentChunk + ',');
-            }
-            return chunks;
-        }
-
         function generateExportData() {
             const usedColors = new Set();
             for (let y = 0; y < state.size; y++) {
@@ -1530,60 +1510,94 @@
                 pixelData += count > 1 ? count + currentChar : currentChar;
             }
             
-            const chunks = [];
-            const paletteHeader = '\n\n【パレット定義】\n';
+            // まず全体のデータ量を計算して送信回数を決定
+            const rawChunks = [];
             
+            // パレットとピクセルデータを一時的に分割
+            const fullPixelData = state.size + '|' + pixelData;
+            
+            // パレットデータの分割
+            const paletteChunks = [];
+            if (paletteStr.length > 0) {
+                const entries = paletteStr.split(',').filter(s => s.length > 0);
+                let currentPaletteChunk = '';
+                for (const entry of entries) {
+                    const toAdd = currentPaletteChunk.length > 0 ? ',' + entry : entry;
+                    if (currentPaletteChunk.length + toAdd.length > MAX_CHUNK_SIZE - 100) {
+                        paletteChunks.push(currentPaletteChunk + ',');
+                        currentPaletteChunk = entry;
+                    } else {
+                        currentPaletteChunk += toAdd;
+                    }
+                }
+                if (currentPaletteChunk.length > 0) {
+                    paletteChunks.push(currentPaletteChunk + ',');
+                }
+            }
+            
+            // ピクセルデータの分割
+            const pixelChunks = [];
+            let remaining = fullPixelData;
+            while (remaining.length > 0) {
+                const chunk = remaining.substring(0, MAX_CHUNK_SIZE - 50);
+                remaining = remaining.substring(MAX_CHUNK_SIZE - 50);
+                pixelChunks.push(chunk);
+            }
+            
+            // 合計送信回数を計算（説明1 + パレット + ピクセルデータ）
+            const totalChunks = 1 + paletteChunks.length + pixelChunks.length;
+            
+            // 最終的なチャンクを構築
+            const chunks = [];
+            let chunkIndex = 1;
+            
+            // 1. 説明チャンク（送信回数の明示を含む）
             const explanation = `【ドット絵データ】
+このデータは${totalChunks}回に分けて送信します。
+
+【重要】
+・各送信の「☆○回目/${totalChunks}回☆」は進捗表示です
+・☆から☆までの部分は画像データではありません
+・全${totalChunks}回を受信後、画像を生成してください
+
+【データ形式】
 サイズ: ${state.size}x${state.size}
 色数: ${usedColors.size}色
 形式: RLE圧縮
 
 【デコード方法】
 ・パレット: 文字:色コード（例: A:FF0000 → Aは赤）
-・データ: 数字+文字 → その文字が数字回連続（例: 5A → Aが5回）
-・数字なし → 1回（例: A → Aが1回）
+・データ: 数字+文字 → その文字が数字回連続
 ・${TRANSPARENT_CHAR} → 透明
 
-【送信マーカー】
-・【送信開始】→ この後からピクセルデータ開始
-・【送信完了】→ データ終了、画像を生成して表示`;
-
-            if (explanation.length + paletteHeader.length + paletteStr.length <= MAX_CHUNK_SIZE) {
-                chunks.push(explanation + paletteHeader + paletteStr);
-                
-                let remaining = '【送信開始】\n' + state.size + '|' + pixelData;
-                while (remaining.length > 0) {
-                    let chunk = remaining.substring(0, MAX_CHUNK_SIZE);
-                    remaining = remaining.substring(MAX_CHUNK_SIZE);
-                    
-                    if (remaining.length === 0) {
-                        chunk += '\n【送信完了】';
-                    }
-                    chunks.push(chunk);
+☆${chunkIndex}回目/${totalChunks}回☆`;
+            chunks.push(explanation);
+            chunkIndex++;
+            
+            // 2. パレットチャンク
+            paletteChunks.forEach((pc, i) => {
+                let chunk = `☆${chunkIndex}回目/${totalChunks}回☆\n`;
+                if (i === 0) {
+                    chunk += '【パレット定義】\n';
                 }
-            } else {
-                chunks.push(explanation);
-                
-                const paletteChunks = splitPaletteString(paletteStr, MAX_CHUNK_SIZE - 20);
-                paletteChunks.forEach((pc, i) => {
-                    if (i === 0) {
-                        chunks.push('【パレット定義】\n' + pc);
-                    } else {
-                        chunks.push(pc);
-                    }
-                });
-                
-                let remaining = '【送信開始】\n' + state.size + '|' + pixelData;
-                while (remaining.length > 0) {
-                    let chunk = remaining.substring(0, MAX_CHUNK_SIZE);
-                    remaining = remaining.substring(MAX_CHUNK_SIZE);
-                    
-                    if (remaining.length === 0) {
-                        chunk += '\n【送信完了】';
-                    }
-                    chunks.push(chunk);
+                chunk += pc;
+                chunks.push(chunk);
+                chunkIndex++;
+            });
+            
+            // 3. ピクセルデータチャンク
+            pixelChunks.forEach((pc, i) => {
+                let chunk = `☆${chunkIndex}回目/${totalChunks}回☆\n`;
+                if (i === 0) {
+                    chunk += '【ピクセルデータ開始】\n';
                 }
-            }
+                chunk += pc;
+                if (i === pixelChunks.length - 1) {
+                    chunk += '\n【送信完了】全データを受信しました。上記の情報を元にドット絵画像を生成・表示してください。';
+                }
+                chunks.push(chunk);
+                chunkIndex++;
+            });
             
             return { chunks, paletteStr, pixelData };
         }
@@ -1598,23 +1612,19 @@
                 const item = document.createElement('div');
                 item.className = 'chunk-item';
                 
-                let label = '';
+                let label = `送信 ${index + 1}/${chunks.length}`;
                 if (index === 0) {
-                    if (chunk.includes('【パレット定義】')) {
-                        label = `送信 ${index + 1}/${chunks.length} (説明+パレット)`;
-                    } else {
-                        label = `送信 ${index + 1}/${chunks.length} (説明)`;
-                    }
-                } else if (chunk.includes('【送信開始】')) {
-                    label = `送信 ${index + 1}/${chunks.length} (データ開始)`;
-                } else if (chunk.includes('【送信完了】')) {
-                    label = `送信 ${index + 1}/${chunks.length} (最終)`;
+                    label += ' (説明)';
                 } else if (chunk.includes('【パレット定義】')) {
-                    label = `送信 ${index + 1}/${chunks.length} (パレット)`;
-                } else if (!chunk.includes('|') && !chunk.includes('【') && chunk.includes(':')) {
-                    label = `送信 ${index + 1}/${chunks.length} (パレット続き)`;
+                    label += ' (パレット)';
+                } else if (chunk.includes('【ピクセルデータ開始】')) {
+                    label += ' (データ開始)';
+                } else if (chunk.includes('【送信完了】')) {
+                    label += ' (最終)';
+                } else if (chunk.includes(':') && !chunk.includes('|')) {
+                    label += ' (パレット続き)';
                 } else {
-                    label = `送信 ${index + 1}/${chunks.length} (データ)`;
+                    label += ' (データ)';
                 }
                 
                 item.innerHTML = `
