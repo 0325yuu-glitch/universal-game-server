@@ -623,8 +623,8 @@
 
     <div class="size-selector">
         <button class="size-btn" data-size="32">32×32</button>
-        <button class="size-btn active" data-size="64">64×64</button>
-        <button class="size-btn" data-size="128">128×128</button>
+        <button class="size-btn" data-size="64">64×64</button>
+        <button class="size-btn active" data-size="128">128×128</button>
     </div>
 
     <div class="toolbar">
@@ -649,7 +649,7 @@
 
     <div class="canvas-controls">
         <button class="ctrl-btn" id="zoomOut">−</button>
-        <button class="ctrl-btn" id="zoomLevel">8x</button>
+        <button class="ctrl-btn" id="zoomLevel">4x</button>
         <button class="ctrl-btn" id="zoomIn">＋</button>
         <button class="ctrl-btn" id="gridToggle">格子</button>
         <button class="ctrl-btn" id="undoBtn">↩️</button>
@@ -710,8 +710,8 @@
             <div class="modal-color-selector">
                 <button class="modal-color-btn" data-colors="16">16色</button>
                 <button class="modal-color-btn" data-colors="32">32色</button>
-                <button class="modal-color-btn active" data-colors="64">64色</button>
-                <button class="modal-color-btn" data-colors="128">128色</button>
+                <button class="modal-color-btn" data-colors="64">64色</button>
+                <button class="modal-color-btn active" data-colors="128">128色</button>
             </div>
             <div class="merge-threshold-container">
                 <span class="merge-threshold-label">近似色の自動統合レベル（大きいほど統合）</span>
@@ -874,13 +874,13 @@
         const COLOR_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
         
         const state = {
-            size: 64,
-            zoom: 8,
+            size: 128,
+            zoom: 4,
             grid: true,
             tool: 'pen',
             penSize: 1,
             currentColor: '#000000',
-            maxColors: 64,
+            maxColors: 128,
             mergeThreshold: 25,
             pixels: [],
             palette: ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'],
@@ -915,6 +915,15 @@
                     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     state.size = parseInt(btn.dataset.size);
+                    // サイズに応じてズームを調整
+                    if (state.size === 128) {
+                        state.zoom = 4;
+                    } else if (state.size === 64) {
+                        state.zoom = 8;
+                    } else {
+                        state.zoom = 12;
+                    }
+                    document.getElementById('zoomLevel').textContent = state.zoom + 'x';
                     initPixels();
                     state.history = [];
                     state.historyIndex = -1;
@@ -1346,13 +1355,13 @@
                 });
                 colorDiv.addEventListener('mouseup', () => clearTimeout(pressTimer));
                 colorDiv.addEventListener('mouseleave', () => clearTimeout(pressTimer));
-                colorDiv.addEventListener('touchstart', () => {
+                colorDiv.addEventListener('touchstart', (e) => {
                     pressTimer = setTimeout(() => {
                         state.palette.splice(index, 1);
                         updatePalette();
                         showToast('色を削除しました');
                     }, LONG_PRESS_DURATION);
-                });
+                }, { passive: true });
                 colorDiv.addEventListener('touchend', () => clearTimeout(pressTimer));
                 colorDiv.addEventListener('contextmenu', (e) => {
                     e.preventDefault();
