@@ -49,6 +49,9 @@
         .top-btn.guide {
             background: #9b59b6;
         }
+        .top-btn.optimize {
+            background: #e67e22;
+        }
         .size-selector {
             display: flex;
             justify-content: center;
@@ -359,6 +362,7 @@
             display: flex;
             justify-content: center;
             gap: 8px;
+            flex-wrap: wrap;
         }
         .modal-color-btn {
             padding: 8px 14px;
@@ -526,6 +530,55 @@
         .prompt-box .prompt-text {
             padding-right: 60px;
         }
+        .optimize-modal-body {
+            padding: 20px;
+            max-width: 400px;
+            width: 100%;
+        }
+        .optimize-section {
+            margin-bottom: 20px;
+        }
+        .optimize-section label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .optimize-slider {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .optimize-value {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #6c5ce7;
+        }
+        .optimize-preview {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            padding: 15px;
+            background: #1a1a2e;
+            border-radius: 8px;
+        }
+        .optimize-preview-item {
+            text-align: center;
+        }
+        .optimize-preview-label {
+            font-size: 11px;
+            color: #888;
+        }
+        .optimize-preview-value {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .optimize-preview-value.before {
+            color: #e74c3c;
+        }
+        .optimize-preview-value.after {
+            color: #27ae60;
+        }
     </style>
 </head>
 <body>
@@ -535,6 +588,7 @@
 
     <div class="top-buttons">
         <button class="top-btn load" id="loadImageBtn">📁 画像読込</button>
+        <button class="top-btn optimize" id="optimizeBtn">🎨 色最適化</button>
         <button class="top-btn clear" id="clearBtn">🗑️ クリア</button>
         <button class="top-btn guide" id="guideBtn">📖 使い方</button>
     </div>
@@ -621,10 +675,12 @@
         </div>
     </div>
 
+    <!-- 画像読込モーダル -->
     <div class="modal" id="cropModal">
         <div class="modal-header">
             <div class="modal-title">ドット絵化するエリアを選択</div>
             <div class="modal-color-selector">
+                <button class="modal-color-btn" data-colors="16">16色</button>
                 <button class="modal-color-btn" data-colors="32">32色</button>
                 <button class="modal-color-btn active" data-colors="64">64色</button>
                 <button class="modal-color-btn" data-colors="128">128色</button>
@@ -647,6 +703,41 @@
         </div>
     </div>
 
+    <!-- 色最適化モーダル -->
+    <div class="modal" id="optimizeModal">
+        <div class="modal-header">
+            <div class="modal-title">🎨 色の最適化</div>
+        </div>
+        <div class="modal-body">
+            <div class="optimize-modal-body">
+                <div class="optimize-section">
+                    <label>類似色の統合しきい値（大きいほど統合される）</label>
+                    <input type="range" class="optimize-slider" id="optimizeThreshold" min="0" max="100" value="30">
+                    <div class="optimize-value" id="optimizeThresholdValue">30</div>
+                </div>
+                <div class="optimize-preview">
+                    <div class="optimize-preview-item">
+                        <div class="optimize-preview-label">現在の色数</div>
+                        <div class="optimize-preview-value before" id="optimizeBefore">0</div>
+                    </div>
+                    <div class="optimize-preview-item">
+                        <div class="optimize-preview-label">→</div>
+                        <div class="optimize-preview-value">→</div>
+                    </div>
+                    <div class="optimize-preview-item">
+                        <div class="optimize-preview-label">最適化後</div>
+                        <div class="optimize-preview-value after" id="optimizeAfter">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn cancel" id="optimizeCancel">キャンセル</button>
+            <button class="modal-btn confirm" id="optimizeConfirm">適用</button>
+        </div>
+    </div>
+
+    <!-- 使い方モーダル -->
     <div class="modal" id="guideModal">
         <div class="modal-header">
             <div class="modal-title">📖 使い方ガイド</div>
@@ -658,8 +749,9 @@
                 <ul>
                     <li><strong>Step 1:</strong> ChatGPT、Gemini、Midjourneyなどでドット絵を生成</li>
                     <li><strong>Step 2:</strong> 「画像読込」で取り込み</li>
-                    <li><strong>Step 3:</strong> 必要に応じて手動で修正</li>
-                    <li><strong>Step 4:</strong> 「データ生成」でテキスト化してGravityへ送信</li>
+                    <li><strong>Step 3:</strong> 「色最適化」で類似色を統合</li>
+                    <li><strong>Step 4:</strong> 必要に応じて手動で修正</li>
+                    <li><strong>Step 5:</strong> 「データ生成」でテキスト化してGravityへ送信</li>
                 </ul>
             </div>
             
@@ -702,7 +794,7 @@
                 <h3>⚠️ 注意点</h3>
                 <div class="warning-box">
                     <strong>色数制限</strong><br>
-                    32色/64色/128色に対応。色が多すぎる場合は自動的に近似色に変換されます。
+                    16色/32色/64色/128色に対応。色が多すぎる場合は自動的に近似色に変換されます。
                 </div>
                 <div class="warning-box">
                     <strong>送信制限</strong><br>
@@ -720,6 +812,7 @@
                     <li><strong>🧹 消しゴム:</strong> 透明色で消去</li>
                     <li><strong>🪣 塗りつぶし:</strong> 連続した同色領域を塗りつぶす</li>
                     <li><strong>💉 スポイト:</strong> キャンバスから色を取得</li>
+                    <li><strong>🎨 色最適化:</strong> 類似色を自動で統合</li>
                     <li><strong>↩️ / ↪️:</strong> 元に戻す / やり直し</li>
                     <li><strong>格子:</strong> グリッド表示の切り替え</li>
                     <li><strong>色の長押し:</strong> パレットから色を削除</li>
@@ -870,6 +963,14 @@
                 document.getElementById('cropModal').classList.remove('active');
             });
             document.getElementById('cropConfirm').addEventListener('click', applyCrop);
+
+            // 色最適化モーダル
+            document.getElementById('optimizeBtn').addEventListener('click', openOptimizeModal);
+            document.getElementById('optimizeCancel').addEventListener('click', () => {
+                document.getElementById('optimizeModal').classList.remove('active');
+            });
+            document.getElementById('optimizeConfirm').addEventListener('click', applyOptimize);
+            document.getElementById('optimizeThreshold').addEventListener('input', updateOptimizePreview);
 
             document.getElementById('guideBtn').addEventListener('click', () => {
                 document.getElementById('guideModal').classList.add('active');
@@ -1192,6 +1293,126 @@
             }
         }
 
+        // 色最適化機能
+        function openOptimizeModal() {
+            const usedColors = getUsedColors();
+            if (usedColors.length === 0) {
+                showToast('描画されたピクセルがありません');
+                return;
+            }
+            
+            document.getElementById('optimizeBefore').textContent = usedColors.length;
+            document.getElementById('optimizeThreshold').value = 30;
+            updateOptimizePreview();
+            document.getElementById('optimizeModal').classList.add('active');
+        }
+
+        function getUsedColors() {
+            const usedColors = new Set();
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    if (state.pixels[y][x]) {
+                        usedColors.add(state.pixels[y][x]);
+                    }
+                }
+            }
+            return Array.from(usedColors);
+        }
+
+        function colorDistance(hex1, hex2) {
+            const rgb1 = hexToRgb(hex1);
+            const rgb2 = hexToRgb(hex2);
+            if (!rgb1 || !rgb2) return Infinity;
+            
+            // 加重ユークリッド距離（人間の目は緑に敏感）
+            const rMean = (rgb1.r + rgb2.r) / 2;
+            const dr = rgb1.r - rgb2.r;
+            const dg = rgb1.g - rgb2.g;
+            const db = rgb1.b - rgb2.b;
+            
+            return Math.sqrt(
+                (2 + rMean / 256) * dr * dr +
+                4 * dg * dg +
+                (2 + (255 - rMean) / 256) * db * db
+            );
+        }
+
+        function mergeColors(colors, threshold) {
+            if (colors.length === 0) return { colorMap: {}, newColors: [] };
+            
+            // 使用頻度でソート（多い順）
+            const colorCounts = {};
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const c = state.pixels[y][x];
+                    if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
+                }
+            }
+            
+            const sortedColors = colors.slice().sort((a, b) => (colorCounts[b] || 0) - (colorCounts[a] || 0));
+            
+            const colorMap = {};
+            const newColors = [];
+            
+            for (const color of sortedColors) {
+                let merged = false;
+                
+                for (const newColor of newColors) {
+                    if (colorDistance(color, newColor) < threshold) {
+                        colorMap[color] = newColor;
+                        merged = true;
+                        break;
+                    }
+                }
+                
+                if (!merged) {
+                    newColors.push(color);
+                    colorMap[color] = color;
+                }
+            }
+            
+            return { colorMap, newColors };
+        }
+
+        function updateOptimizePreview() {
+            const threshold = parseInt(document.getElementById('optimizeThreshold').value);
+            document.getElementById('optimizeThresholdValue').textContent = threshold;
+            
+            const usedColors = getUsedColors();
+            const { newColors } = mergeColors(usedColors, threshold);
+            
+            document.getElementById('optimizeBefore').textContent = usedColors.length;
+            document.getElementById('optimizeAfter').textContent = newColors.length;
+        }
+
+        function applyOptimize() {
+            const threshold = parseInt(document.getElementById('optimizeThreshold').value);
+            const usedColors = getUsedColors();
+            const { colorMap, newColors } = mergeColors(usedColors, threshold);
+            
+            // ピクセルの色を置換
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const c = state.pixels[y][x];
+                    if (c && colorMap[c]) {
+                        state.pixels[y][x] = colorMap[c];
+                    }
+                }
+            }
+            
+            // パレットを更新
+            state.palette = newColors;
+            
+            document.getElementById('optimizeModal').classList.remove('active');
+            render();
+            updatePalette();
+            updateStats();
+            saveHistory();
+            
+            const reduced = usedColors.length - newColors.length;
+            showToast(`${reduced}色を統合しました（${usedColors.length}→${newColors.length}色）`);
+        }
+
         let cropImage = null;
         let cropCanvasRect = { width: 0, height: 0 };
         let cropRect = { x: 0, y: 0, width: 100, height: 100 };
@@ -1511,9 +1732,6 @@
             }
             
             // まず全体のデータ量を計算して送信回数を決定
-            const rawChunks = [];
-            
-            // パレットとピクセルデータを一時的に分割
             const fullPixelData = state.size + '|' + pixelData;
             
             // パレットデータの分割
@@ -1544,14 +1762,14 @@
                 pixelChunks.push(chunk);
             }
             
-            // 合計送信回数を計算（説明1 + パレット + ピクセルデータ）
+            // 合計送信回数を計算
             const totalChunks = 1 + paletteChunks.length + pixelChunks.length;
             
             // 最終的なチャンクを構築
             const chunks = [];
             let chunkIndex = 1;
             
-            // 1. 説明チャンク（送信回数の明示を含む）
+            // 1. 説明チャンク
             const explanation = `【ドット絵データ】
 このデータは${totalChunks}回に分けて送信します。
 
