@@ -446,6 +446,8 @@
             border-radius: 8px;
             z-index: 2000;
             display: none;
+            max-width: 90%;
+            text-align: center;
         }
         .toast.show {
             display: block;
@@ -579,6 +581,32 @@
         .optimize-preview-value.after {
             color: #27ae60;
         }
+        .merge-threshold-container {
+            margin-top: 15px;
+            padding: 12px;
+            background: #1a1a2e;
+            border-radius: 8px;
+        }
+        .merge-threshold-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .merge-threshold-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .merge-threshold-slider {
+            flex: 1;
+        }
+        .merge-threshold-value {
+            min-width: 30px;
+            text-align: center;
+            font-weight: bold;
+            color: #e67e22;
+        }
     </style>
 </head>
 <body>
@@ -685,6 +713,13 @@
                 <button class="modal-color-btn active" data-colors="64">64色</button>
                 <button class="modal-color-btn" data-colors="128">128色</button>
             </div>
+            <div class="merge-threshold-container">
+                <span class="merge-threshold-label">近似色の自動統合レベル（大きいほど統合）</span>
+                <div class="merge-threshold-row">
+                    <input type="range" class="merge-threshold-slider" id="mergeThresholdSlider" min="0" max="80" value="25">
+                    <span class="merge-threshold-value" id="mergeThresholdValue">25</span>
+                </div>
+            </div>
         </div>
         <div class="modal-body">
             <div class="crop-wrapper" id="cropWrapper">
@@ -748,8 +783,8 @@
                 <p>このエディタは、AIで生成したドット絵をGravityに送信するために最適化されています。</p>
                 <ul>
                     <li><strong>Step 1:</strong> ChatGPT、Gemini、Midjourneyなどでドット絵を生成</li>
-                    <li><strong>Step 2:</strong> 「画像読込」で取り込み</li>
-                    <li><strong>Step 3:</strong> 「色最適化」で類似色を統合</li>
+                    <li><strong>Step 2:</strong> 「画像読込」で取り込み（自動で近似色を統合）</li>
+                    <li><strong>Step 3:</strong> 必要なら「色最適化」でさらに色数を減らす</li>
                     <li><strong>Step 4:</strong> 必要に応じて手動で修正</li>
                     <li><strong>Step 5:</strong> 「データ生成」でテキスト化してGravityへ送信</li>
                 </ul>
@@ -794,7 +829,7 @@
                 <h3>⚠️ 注意点</h3>
                 <div class="warning-box">
                     <strong>色数制限</strong><br>
-                    16色/32色/64色/128色に対応。色が多すぎる場合は自動的に近似色に変換されます。
+                    16色/32色/64色/128色に対応。画像読込時に自動で近似色が統合されます。
                 </div>
                 <div class="warning-box">
                     <strong>送信制限</strong><br>
@@ -815,6 +850,7 @@
                     <li><strong>🎨 色最適化:</strong> 類似色を自動で統合</li>
                     <li><strong>↩️ / ↪️:</strong> 元に戻す / やり直し</li>
                     <li><strong>格子:</strong> グリッド表示の切り替え</li>
+                    <li><strong>ピンチ操作:</strong> 2本指でズームイン/アウト</li>
                     <li><strong>色の長押し:</strong> パレットから色を削除</li>
                 </ul>
             </div>
@@ -832,6 +868,8 @@
         const MAX_CHUNK_SIZE = 950;
         const TRANSPARENT_CHAR = '_';
         const LONG_PRESS_DURATION = 500;
+        const MIN_ZOOM = 2;
+        const MAX_ZOOM = 20;
         
         const COLOR_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
         
@@ -843,13 +881,16 @@
             penSize: 1,
             currentColor: '#000000',
             maxColors: 64,
+            mergeThreshold: 25,
             pixels: [],
             palette: ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'],
             history: [],
             historyIndex: -1,
             isDrawing: false,
             lastX: -1,
-            lastY: -1
+            lastY: -1,
+            isPinching: false,
+            lastPinchDist: 0
         };
 
         const canvas = document.getElementById('mainCanvas');
@@ -899,6 +940,12 @@
                 });
             });
 
+            const mergeSlider = document.getElementById('mergeThresholdSlider');
+            mergeSlider.addEventListener('input', () => {
+                state.mergeThreshold = parseInt(mergeSlider.value);
+                document.getElementById('mergeThresholdValue').textContent = state.mergeThreshold;
+            });
+
             const penSizeSlider = document.getElementById('penSizeSlider');
             penSizeSlider.addEventListener('input', () => {
                 state.penSize = parseInt(penSizeSlider.value);
@@ -915,17 +962,16 @@
             canvas.addEventListener('mouseleave', handleCanvasEnd);
             canvas.addEventListener('touchstart', handleCanvasTouchStart, { passive: false });
             canvas.addEventListener('touchmove', handleCanvasTouchMove, { passive: false });
-            canvas.addEventListener('touchend', handleCanvasEnd);
+            canvas.addEventListener('touchend', handleCanvasTouchEnd);
+
+            // マウスホイールでズーム
+            canvas.addEventListener('wheel', handleWheel, { passive: false });
 
             document.getElementById('zoomIn').addEventListener('click', () => {
-                state.zoom = Math.min(state.zoom + 2, 16);
-                document.getElementById('zoomLevel').textContent = state.zoom + 'x';
-                render();
+                setZoom(state.zoom + 2);
             });
             document.getElementById('zoomOut').addEventListener('click', () => {
-                state.zoom = Math.max(state.zoom - 2, 2);
-                document.getElementById('zoomLevel').textContent = state.zoom + 'x';
-                render();
+                setZoom(state.zoom - 2);
             });
             document.getElementById('gridToggle').addEventListener('click', () => {
                 state.grid = !state.grid;
@@ -964,7 +1010,6 @@
             });
             document.getElementById('cropConfirm').addEventListener('click', applyCrop);
 
-            // 色最適化モーダル
             document.getElementById('optimizeBtn').addEventListener('click', openOptimizeModal);
             document.getElementById('optimizeCancel').addEventListener('click', () => {
                 document.getElementById('optimizeModal').classList.remove('active');
@@ -988,6 +1033,24 @@
                     redo();
                 }
             });
+        }
+
+        function setZoom(newZoom) {
+            state.zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+            document.getElementById('zoomLevel').textContent = state.zoom + 'x';
+            render();
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -1 : 1;
+            setZoom(state.zoom + delta);
+        }
+
+        function getPinchDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
         }
 
         function getCanvasPos(e) {
@@ -1028,23 +1091,76 @@
 
         function handleCanvasTouchStart(e) {
             e.preventDefault();
-            const touch = e.touches[0];
-            state.isDrawing = true;
-            const pos = getCanvasPos(touch);
-            state.lastX = pos.x;
-            state.lastY = pos.y;
-            applyTool(pos.x, pos.y);
+            
+            // 2本指タッチ = ピンチズーム開始
+            if (e.touches.length === 2) {
+                state.isPinching = true;
+                state.isDrawing = false;
+                state.lastPinchDist = getPinchDistance(e.touches);
+                return;
+            }
+            
+            // 1本指タッチ = 描画
+            if (e.touches.length === 1 && !state.isPinching) {
+                const touch = e.touches[0];
+                state.isDrawing = true;
+                const pos = getCanvasPos(touch);
+                state.lastX = pos.x;
+                state.lastY = pos.y;
+                applyTool(pos.x, pos.y);
+            }
         }
 
         function handleCanvasTouchMove(e) {
             e.preventDefault();
-            if (!state.isDrawing) return;
+            
+            // ピンチズーム処理
+            if (e.touches.length === 2 && state.isPinching) {
+                const currentDist = getPinchDistance(e.touches);
+                const diff = currentDist - state.lastPinchDist;
+                
+                // 感度調整（20pxごとに1段階ズーム）
+                if (Math.abs(diff) > 20) {
+                    const zoomDelta = diff > 0 ? 1 : -1;
+                    setZoom(state.zoom + zoomDelta);
+                    state.lastPinchDist = currentDist;
+                }
+                return;
+            }
+            
+            // 描画処理
+            if (!state.isDrawing || state.isPinching) return;
+            if (e.touches.length !== 1) return;
+            
             const touch = e.touches[0];
             const pos = getCanvasPos(touch);
             if (pos.x !== state.lastX || pos.y !== state.lastY) {
                 drawLine(state.lastX, state.lastY, pos.x, pos.y);
                 state.lastX = pos.x;
                 state.lastY = pos.y;
+            }
+        }
+
+        function handleCanvasTouchEnd(e) {
+            // 全ての指が離れたらピンチ終了
+            if (e.touches.length === 0) {
+                if (state.isPinching) {
+                    state.isPinching = false;
+                    state.lastPinchDist = 0;
+                }
+                if (state.isDrawing) {
+                    state.isDrawing = false;
+                    state.lastX = -1;
+                    state.lastY = -1;
+                    if (state.tool === 'pen' || state.tool === 'eraser' || state.tool === 'fill') {
+                        saveHistory();
+                    }
+                }
+            }
+            // まだ1本指が残っている場合
+            else if (e.touches.length === 1) {
+                state.isPinching = false;
+                // ピンチ後の1本指は描画開始しない（誤操作防止）
             }
         }
 
@@ -1293,7 +1409,67 @@
             }
         }
 
-        // 色最適化機能
+        function colorDistance(hex1, hex2) {
+            const rgb1 = hexToRgb(hex1);
+            const rgb2 = hexToRgb(hex2);
+            if (!rgb1 || !rgb2) return Infinity;
+            
+            const rMean = (rgb1.r + rgb2.r) / 2;
+            const dr = rgb1.r - rgb2.r;
+            const dg = rgb1.g - rgb2.g;
+            const db = rgb1.b - rgb2.b;
+            
+            return Math.sqrt(
+                (2 + rMean / 256) * dr * dr +
+                4 * dg * dg +
+                (2 + (255 - rMean) / 256) * db * db
+            );
+        }
+
+        function mergeColorsFromList(colors, colorCounts, threshold, maxColors) {
+            const colorMap = {};
+            const newColors = [];
+            
+            const sortedColors = colors.slice().sort((a, b) => (colorCounts.get(b) || 0) - (colorCounts.get(a) || 0));
+            
+            for (const color of sortedColors) {
+                let merged = false;
+                
+                if (newColors.length >= maxColors) {
+                    let closestColor = null;
+                    let closestDist = Infinity;
+                    
+                    for (const newColor of newColors) {
+                        const dist = colorDistance(color, newColor);
+                        if (dist < closestDist) {
+                            closestDist = dist;
+                            closestColor = newColor;
+                        }
+                    }
+                    
+                    if (closestColor) {
+                        colorMap[color] = closestColor;
+                        merged = true;
+                    }
+                } else {
+                    for (const newColor of newColors) {
+                        if (colorDistance(color, newColor) < threshold) {
+                            colorMap[color] = newColor;
+                            merged = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!merged) {
+                    newColors.push(color);
+                    colorMap[color] = color;
+                }
+            }
+            
+            return { colorMap, newColors };
+        }
+
         function openOptimizeModal() {
             const usedColors = getUsedColors();
             if (usedColors.length === 0) {
@@ -1319,59 +1495,18 @@
             return Array.from(usedColors);
         }
 
-        function colorDistance(hex1, hex2) {
-            const rgb1 = hexToRgb(hex1);
-            const rgb2 = hexToRgb(hex2);
-            if (!rgb1 || !rgb2) return Infinity;
-            
-            // 加重ユークリッド距離（人間の目は緑に敏感）
-            const rMean = (rgb1.r + rgb2.r) / 2;
-            const dr = rgb1.r - rgb2.r;
-            const dg = rgb1.g - rgb2.g;
-            const db = rgb1.b - rgb2.b;
-            
-            return Math.sqrt(
-                (2 + rMean / 256) * dr * dr +
-                4 * dg * dg +
-                (2 + (255 - rMean) / 256) * db * db
-            );
-        }
-
         function mergeColors(colors, threshold) {
             if (colors.length === 0) return { colorMap: {}, newColors: [] };
             
-            // 使用頻度でソート（多い順）
-            const colorCounts = {};
+            const colorCounts = new Map();
             for (let y = 0; y < state.size; y++) {
                 for (let x = 0; x < state.size; x++) {
                     const c = state.pixels[y][x];
-                    if (c) colorCounts[c] = (colorCounts[c] || 0) + 1;
+                    if (c) colorCounts.set(c, (colorCounts.get(c) || 0) + 1);
                 }
             }
             
-            const sortedColors = colors.slice().sort((a, b) => (colorCounts[b] || 0) - (colorCounts[a] || 0));
-            
-            const colorMap = {};
-            const newColors = [];
-            
-            for (const color of sortedColors) {
-                let merged = false;
-                
-                for (const newColor of newColors) {
-                    if (colorDistance(color, newColor) < threshold) {
-                        colorMap[color] = newColor;
-                        merged = true;
-                        break;
-                    }
-                }
-                
-                if (!merged) {
-                    newColors.push(color);
-                    colorMap[color] = color;
-                }
-            }
-            
-            return { colorMap, newColors };
+            return mergeColorsFromList(colors, colorCounts, threshold, MAX_COLORS);
         }
 
         function updateOptimizePreview() {
@@ -1390,7 +1525,6 @@
             const usedColors = getUsedColors();
             const { colorMap, newColors } = mergeColors(usedColors, threshold);
             
-            // ピクセルの色を置換
             for (let y = 0; y < state.size; y++) {
                 for (let x = 0; x < state.size; x++) {
                     const c = state.pixels[y][x];
@@ -1400,7 +1534,6 @@
                 }
             }
             
-            // パレットを更新
             state.palette = newColors;
             
             document.getElementById('optimizeModal').classList.remove('active');
@@ -1619,17 +1752,24 @@
             const imageData = tempCtx.getImageData(0, 0, state.size, state.size);
             const pixels = imageData.data;
             
-            const colorMap = new Map();
+            const colorCounts = new Map();
             for (let i = 0; i < pixels.length; i += 4) {
                 if (pixels[i + 3] < 128) continue;
                 const hex = rgbToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
-                colorMap.set(hex, (colorMap.get(hex) || 0) + 1);
+                colorCounts.set(hex, (colorCounts.get(hex) || 0) + 1);
             }
             
-            let reducedPalette = Array.from(colorMap.entries())
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, state.maxColors)
-                .map(e => e[0]);
+            const allColors = Array.from(colorCounts.keys());
+            const originalColorCount = allColors.length;
+            
+            const { colorMap, newColors } = mergeColorsFromList(
+                allColors, 
+                colorCounts, 
+                state.mergeThreshold, 
+                state.maxColors
+            );
+            
+            const reducedPalette = newColors.slice(0, state.maxColors);
             
             for (let y = 0; y < state.size; y++) {
                 for (let x = 0; x < state.size; x++) {
@@ -1638,7 +1778,12 @@
                         state.pixels[y][x] = null;
                     } else {
                         const hex = rgbToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
-                        state.pixels[y][x] = findClosestColor(hex, reducedPalette);
+                        const mappedColor = colorMap[hex] || hex;
+                        if (reducedPalette.includes(mappedColor)) {
+                            state.pixels[y][x] = mappedColor;
+                        } else {
+                            state.pixels[y][x] = findClosestColor(mappedColor, reducedPalette);
+                        }
                     }
                 }
             }
@@ -1650,7 +1795,7 @@
             render();
             updateStats();
             saveHistory();
-            showToast('画像を変換しました');
+            showToast(`画像を変換（${originalColorCount}色→${reducedPalette.length}色）`);
         }
 
         function rgbToHex(r, g, b) {
@@ -1731,10 +1876,8 @@
                 pixelData += count > 1 ? count + currentChar : currentChar;
             }
             
-            // まず全体のデータ量を計算して送信回数を決定
             const fullPixelData = state.size + '|' + pixelData;
             
-            // パレットデータの分割
             const paletteChunks = [];
             if (paletteStr.length > 0) {
                 const entries = paletteStr.split(',').filter(s => s.length > 0);
@@ -1753,7 +1896,6 @@
                 }
             }
             
-            // ピクセルデータの分割
             const pixelChunks = [];
             let remaining = fullPixelData;
             while (remaining.length > 0) {
@@ -1762,14 +1904,11 @@
                 pixelChunks.push(chunk);
             }
             
-            // 合計送信回数を計算
             const totalChunks = 1 + paletteChunks.length + pixelChunks.length;
             
-            // 最終的なチャンクを構築
             const chunks = [];
             let chunkIndex = 1;
             
-            // 1. 説明チャンク
             const explanation = `【ドット絵データ】
 このデータは${totalChunks}回に分けて送信します。
 
@@ -1792,7 +1931,6 @@
             chunks.push(explanation);
             chunkIndex++;
             
-            // 2. パレットチャンク
             paletteChunks.forEach((pc, i) => {
                 let chunk = `☆${chunkIndex}回目/${totalChunks}回☆\n`;
                 if (i === 0) {
@@ -1803,7 +1941,6 @@
                 chunkIndex++;
             });
             
-            // 3. ピクセルデータチャンク
             pixelChunks.forEach((pc, i) => {
                 let chunk = `☆${chunkIndex}回目/${totalChunks}回☆\n`;
                 if (i === 0) {
