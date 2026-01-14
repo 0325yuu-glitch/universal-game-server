@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gravity ドットエディタ</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            margin: 0;
+            padding: 70px 10px 20px 10px;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 12px;
+        }
+        .header h1 {
+            font-size: 18px;
+            margin: 0;
+        }
+        .top-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .top-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #fff;
+        }
+        .top-btn.load {
+            background: #4a4a6a;
+        }
+        .top-btn.clear {
+            background: #e74c3c;
+        }
+        .top-btn.guide {
+            background: #9b59b6;
+        }
+        .size-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .size-btn {
+            padding: 8px 16px;
+            border: 2px solid #4a4a6a;
+            background: transparent;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .size-btn.active {
+            background: #6c5ce7;
+            border-color: #6c5ce7;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .tool-btn {
+            padding: 8px 12px;
+            border: 2px solid #4a4a6a;
+            background: transparent;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .tool-btn.active {
+            background: #6c5ce7;
+            border-color: #6c5ce7;
+        }
+        .pen-size-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #2a2a4a;
+            border-radius: 8px;
+        }
+        .pen-size-label {
+            font-size: 12px;
+            color: #aaa;
+        }
+        .pen-size-slider {
+            width: 120px;
+            cursor: pointer;
+        }
+        .pen-size-value {
+            font-size: 14px;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: center;
+        }
+        .pen-size-preview {
+            width: 32px;
+            height: 32px;
+            background: #1a1a2e;
+            border: 1px solid #4a4a6a;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pen-size-dot {
+            background: #fff;
+            border-radius: 50%;
+        }
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 12px;
+            overflow: auto;
+            max-width: 100%;
+        }
+        #mainCanvas {
+            border: 2px solid #4a4a6a;
+            cursor: crosshair;
+            touch-action: none;
+            image-rendering: pixelated;
+        }
+        .canvas-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .ctrl-btn {
+            padding: 8px 16px;
+            border: none;
+            background: #4a4a6a;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .ctrl-btn:active {
+            background: #6c5ce7;
+        }
+        .color-section {
+            background: #2a2a4a;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+        .color-section-title {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        .color-section-scroll-hint {
+            font-size: 10px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .current-color {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .color-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: 2px solid #fff;
+        }
+        .color-input-wrapper {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        #colorPicker {
+            width: 60px;
+            height: 36px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-color-btn {
+            padding: 8px 16px;
+            background: #27ae60;
+            border: none;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .palette-color {
+            aspect-ratio: 1;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .palette-color.active {
+            border-color: #fff;
+        }
+        .palette-color.transparent-color {
+            background: linear-gradient(45deg, #666 25%, #888 25%, #888 50%, #666 50%, #666 75%, #888 75%);
+            background-size: 8px 8px;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: #2a2a4a;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #6c5ce7;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #aaa;
+        }
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .action-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #fff;
+        }
+        .action-btn.primary {
+            background: #6c5ce7;
+        }
+        .export-section {
+            background: #2a2a4a;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+        .chunk-container {
+            margin-top: 10px;
+        }
+        .chunk-item {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+        .chunk-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .chunk-label {
+            font-size: 12px;
+            color: #aaa;
+        }
+        .chunk-copy-btn {
+            padding: 6px 12px;
+            background: #6c5ce7;
+            border: none;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .chunk-text {
+            width: 100%;
+            height: 80px;
+            background: #0a0a1e;
+            border: 1px solid #4a4a6a;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 10px;
+            padding: 8px;
+            resize: none;
+            font-family: monospace;
+        }
+        .preview-section {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .preview-item {
+            text-align: center;
+        }
+        .preview-label {
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 5px;
+        }
+        .preview-canvas {
+            border: 1px solid #4a4a6a;
+            image-rendering: pixelated;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            overflow: auto;
+        }
+        .modal.active {
+            display: flex;
+            flex-direction: column;
+        }
+        .modal-header {
+            padding: 70px 15px 15px 15px;
+            text-align: center;
+            background: #1a1a2e;
+            border-bottom: 1px solid #4a4a6a;
+        }
+        .modal-title {
+            font-size: 16px;
+            margin: 0 0 12px 0;
+        }
+        .modal-color-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+        .modal-color-btn {
+            padding: 8px 14px;
+            border: 2px solid #4a4a6a;
+            background: transparent;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .modal-color-btn.active {
+            background: #e67e22;
+            border-color: #e67e22;
+        }
+        .modal-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
+            overflow: auto;
+        }
+        .crop-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        #cropCanvas {
+            display: block;
+            max-width: 100%;
+            max-height: 60vh;
+        }
+        .crop-selection {
+            position: absolute;
+            border: 2px dashed #6c5ce7;
+            background: rgba(108, 92, 231, 0.2);
+            cursor: move;
+            pointer-events: auto;
+        }
+        .crop-handle {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: #6c5ce7;
+            border: 2px solid #fff;
+            border-radius: 50%;
+        }
+        .crop-handle.tl { top: -12px; left: -12px; cursor: nwse-resize; }
+        .crop-handle.tr { top: -12px; right: -12px; cursor: nesw-resize; }
+        .crop-handle.bl { bottom: -12px; left: -12px; cursor: nesw-resize; }
+        .crop-handle.br { bottom: -12px; right: -12px; cursor: nwse-resize; }
+        .modal-footer {
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            background: #1a1a2e;
+            border-top: 1px solid #4a4a6a;
+        }
+        .modal-btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #fff;
+        }
+        .modal-btn.cancel {
+            background: #e74c3c;
+        }
+        .modal-btn.confirm {
+            background: #27ae60;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #6c5ce7;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 2000;
+            display: none;
+        }
+        .toast.show {
+            display: block;
+        }
+        .guide-modal-body {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .guide-section {
+            margin-bottom: 24px;
+        }
+        .guide-section h3 {
+            color: #6c5ce7;
+            font-size: 16px;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #4a4a6a;
+        }
+        .guide-section p {
+            margin: 8px 0;
+            line-height: 1.6;
+            font-size: 14px;
+            color: #ddd;
+        }
+        .guide-section ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .guide-section li {
+            margin: 8px 0;
+            line-height: 1.6;
+            font-size: 14px;
+            color: #ddd;
+        }
+        .tip-box {
+            background: rgba(39, 174, 96, 0.2);
+            border-left: 3px solid #27ae60;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+        }
+        .tip-box strong {
+            color: #27ae60;
+        }
+        .warning-box {
+            background: rgba(231, 76, 60, 0.2);
+            border-left: 3px solid #e74c3c;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+        }
+        .warning-box strong {
+            color: #e74c3c;
+        }
+        .prompt-box {
+            background: #0a0a1e;
+            border: 1px solid #6c5ce7;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            font-family: monospace;
+            font-size: 12px;
+            color: #a0f0a0;
+            word-break: break-all;
+            position: relative;
+        }
+        .prompt-box .copy-prompt-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            padding: 4px 10px;
+            border: none;
+            border-radius: 4px;
+            background: #6c5ce7;
+            color: #fff;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .prompt-box .prompt-text {
+            padding-right: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Gravity ドットエディタ</h1>
+    </div>
+
+    <div class="top-buttons">
+        <button class="top-btn load" id="loadImageBtn">📁 画像読込</button>
+        <button class="top-btn clear" id="clearBtn">🗑️ クリア</button>
+        <button class="top-btn guide" id="guideBtn">📖 使い方</button>
+    </div>
+
+    <div class="size-selector">
+        <button class="size-btn" data-size="32">32×32</button>
+        <button class="size-btn active" data-size="64">64×64</button>
+        <button class="size-btn" data-size="128">128×128</button>
+    </div>
+
+    <div class="toolbar">
+        <button class="tool-btn active" data-tool="pen">✏️ ペン</button>
+        <button class="tool-btn" data-tool="eraser">🧹 消しゴム</button>
+        <button class="tool-btn" data-tool="fill">🪣 塗りつぶし</button>
+        <button class="tool-btn" data-tool="picker">💉 スポイト</button>
+    </div>
+
+    <div class="pen-size-container">
+        <span class="pen-size-label">サイズ:</span>
+        <input type="range" class="pen-size-slider" id="penSizeSlider" min="1" max="16" value="1">
+        <span class="pen-size-value" id="penSizeValue">1 px</span>
+        <div class="pen-size-preview">
+            <div class="pen-size-dot" id="penSizeDot" style="width: 1px; height: 1px;"></div>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <div class="canvas-controls">
+        <button class="ctrl-btn" id="zoomOut">−</button>
+        <button class="ctrl-btn" id="zoomLevel">8x</button>
+        <button class="ctrl-btn" id="zoomIn">＋</button>
+        <button class="ctrl-btn" id="gridToggle">格子</button>
+        <button class="ctrl-btn" id="undoBtn">↩️</button>
+        <button class="ctrl-btn" id="redoBtn">↪️</button>
+    </div>
+
+    <div class="color-section">
+        <div class="color-section-title">カラーパレット（↓スクロールで他の色）</div>
+        <div class="current-color">
+            <div class="color-preview" id="currentColorPreview" style="background: #000000;"></div>
+            <div class="color-input-wrapper">
+                <input type="color" id="colorPicker" value="#000000">
+                <button class="add-color-btn" id="addColorBtn">+ 追加</button>
+            </div>
+        </div>
+        <div class="color-section-scroll-hint">長押しで色を削除</div>
+        <div class="palette-grid" id="paletteGrid"></div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-value" id="colorCount">0</div>
+            <div class="stat-label">使用色数</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="totalChars">0</div>
+            <div class="stat-label">文字数</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="sendCount">0</div>
+            <div class="stat-label">送信回数</div>
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <button class="action-btn primary" id="exportBtn">📤 データ生成</button>
+    </div>
+
+    <div class="export-section" id="exportSection" style="display: none;">
+        <div class="chunk-container" id="chunkContainer"></div>
+    </div>
+
+    <div class="preview-section">
+        <div class="preview-item">
+            <div class="preview-label">等倍</div>
+            <canvas class="preview-canvas" id="preview1x"></canvas>
+        </div>
+        <div class="preview-item">
+            <div class="preview-label">2倍</div>
+            <canvas class="preview-canvas" id="preview2x"></canvas>
+        </div>
+    </div>
+
+    <div class="modal" id="cropModal">
+        <div class="modal-header">
+            <div class="modal-title">ドット絵化するエリアを選択</div>
+            <div class="modal-color-selector">
+                <button class="modal-color-btn" data-colors="32">32色</button>
+                <button class="modal-color-btn active" data-colors="64">64色</button>
+                <button class="modal-color-btn" data-colors="128">128色</button>
+            </div>
+        </div>
+        <div class="modal-body">
+            <div class="crop-wrapper" id="cropWrapper">
+                <canvas id="cropCanvas"></canvas>
+                <div class="crop-selection" id="cropSelection">
+                    <div class="crop-handle tl" data-handle="tl"></div>
+                    <div class="crop-handle tr" data-handle="tr"></div>
+                    <div class="crop-handle bl" data-handle="bl"></div>
+                    <div class="crop-handle br" data-handle="br"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn cancel" id="cropCancel">キャンセル</button>
+            <button class="modal-btn confirm" id="cropConfirm">適用</button>
+        </div>
+    </div>
+
+    <div class="modal" id="guideModal">
+        <div class="modal-header">
+            <div class="modal-title">📖 使い方ガイド</div>
+        </div>
+        <div class="guide-modal-body">
+            <div class="guide-section">
+                <h3>🎨 おすすめワークフロー</h3>
+                <p>このエディタは、AIで生成したドット絵をGravityに送信するために最適化されています。</p>
+                <ul>
+                    <li><strong>Step 1:</strong> ChatGPT、Gemini、Midjourneyなどでドット絵を生成</li>
+                    <li><strong>Step 2:</strong> 「画像読込」で取り込み</li>
+                    <li><strong>Step 3:</strong> 必要に応じて手動で修正</li>
+                    <li><strong>Step 4:</strong> 「データ生成」でテキスト化してGravityへ送信</li>
+                </ul>
+            </div>
+            
+            <div class="guide-section">
+                <h3>💡 AIプロンプトのコツ</h3>
+                <div class="tip-box">
+                    <strong>背景は単色に</strong><br>
+                    白・黒・透明などの単色背景にすると、データ圧縮効率が上がり送信回数が減ります。
+                </div>
+                <div class="tip-box">
+                    <strong>解像度を指定</strong><br>
+                    32×32、64×64、128×128など、正方形サイズを明示しましょう。
+                </div>
+                <div class="tip-box">
+                    <strong>ドット絵スタイルを明記</strong><br>
+                    「pixel art」「8-bit」「16-bit」「retro game sprite」などのキーワードを入れましょう。
+                </div>
+            </div>
+            
+            <div class="guide-section">
+                <h3>📝 コピペ用プロンプト</h3>
+                <p><strong>日本語:</strong></p>
+                <div class="prompt-box">
+                    <button class="copy-prompt-btn" onclick="copyPromptText(this)">コピー</button>
+                    <div class="prompt-text">32×32ピクセルのドット絵で、[キャラクターの説明]を描いてください。背景は透明、アンチエイリアスなし、レトロゲーム風でお願いします。</div>
+                </div>
+                <p><strong>英語（より高精度）:</strong></p>
+                <div class="prompt-box">
+                    <button class="copy-prompt-btn" onclick="copyPromptText(this)">コピー</button>
+                    <div class="prompt-text">Create a 32x32 pixel art sprite of [character description]. Style: retro game, clean pixels, transparent background, no anti-aliasing, limited color palette.</div>
+                </div>
+                <p><strong>キャラクター例:</strong></p>
+                <div class="prompt-box">
+                    <button class="copy-prompt-btn" onclick="copyPromptText(this)">コピー</button>
+                    <div class="prompt-text">Create a 64x64 pixel art sprite of a cute knight with silver armor and red cape. Style: 16-bit SNES RPG, transparent background, no anti-aliasing.</div>
+                </div>
+            </div>
+            
+            <div class="guide-section">
+                <h3>⚠️ 注意点</h3>
+                <div class="warning-box">
+                    <strong>色数制限</strong><br>
+                    32色/64色/128色に対応。色が多すぎる場合は自動的に近似色に変換されます。
+                </div>
+                <div class="warning-box">
+                    <strong>送信制限</strong><br>
+                    Gravityは1回1000文字、1日50回まで。送信回数目安：<br>
+                    ・32×32: 1〜2回<br>
+                    ・64×64: 2〜4回<br>
+                    ・128×128: 4〜8回
+                </div>
+            </div>
+            
+            <div class="guide-section">
+                <h3>🛠️ エディタ機能</h3>
+                <ul>
+                    <li><strong>✏️ ペン:</strong> ドットを描く（サイズ調整可能）</li>
+                    <li><strong>🧹 消しゴム:</strong> 透明色で消去</li>
+                    <li><strong>🪣 塗りつぶし:</strong> 連続した同色領域を塗りつぶす</li>
+                    <li><strong>💉 スポイト:</strong> キャンバスから色を取得</li>
+                    <li><strong>↩️ / ↪️:</strong> 元に戻す / やり直し</li>
+                    <li><strong>格子:</strong> グリッド表示の切り替え</li>
+                    <li><strong>色の長押し:</strong> パレットから色を削除</li>
+                </ul>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="modal-btn confirm" id="guideClose">閉じる</button>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const MAX_COLORS = 144;
+        const MAX_CHUNK_SIZE = 950;
+        const TRANSPARENT_CHAR = '_';
+        const LONG_PRESS_DURATION = 500;
+        
+        const COLOR_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzあいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+        
+        const state = {
+            size: 64,
+            zoom: 8,
+            grid: true,
+            tool: 'pen',
+            penSize: 1,
+            currentColor: '#000000',
+            maxColors: 64,
+            pixels: [],
+            palette: ['#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'],
+            history: [],
+            historyIndex: -1,
+            isDrawing: false,
+            lastX: -1,
+            lastY: -1
+        };
+
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function init() {
+            initPixels();
+            setupEventListeners();
+            render();
+            updatePalette();
+            updateStats();
+            saveHistory();
+        }
+
+        function initPixels() {
+            state.pixels = Array(state.size).fill(null).map(() => Array(state.size).fill(null));
+        }
+
+        function setupEventListeners() {
+            document.querySelectorAll('.size-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.size = parseInt(btn.dataset.size);
+                    initPixels();
+                    state.history = [];
+                    state.historyIndex = -1;
+                    render();
+                    updateStats();
+                    saveHistory();
+                });
+            });
+
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.tool = btn.dataset.tool;
+                });
+            });
+
+            document.querySelectorAll('.modal-color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.modal-color-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    state.maxColors = parseInt(btn.dataset.colors);
+                });
+            });
+
+            const penSizeSlider = document.getElementById('penSizeSlider');
+            penSizeSlider.addEventListener('input', () => {
+                state.penSize = parseInt(penSizeSlider.value);
+                document.getElementById('penSizeValue').textContent = state.penSize + ' px';
+                const dot = document.getElementById('penSizeDot');
+                const size = Math.min(state.penSize * 2, 28);
+                dot.style.width = size + 'px';
+                dot.style.height = size + 'px';
+            });
+
+            canvas.addEventListener('mousedown', handleCanvasStart);
+            canvas.addEventListener('mousemove', handleCanvasMove);
+            canvas.addEventListener('mouseup', handleCanvasEnd);
+            canvas.addEventListener('mouseleave', handleCanvasEnd);
+            canvas.addEventListener('touchstart', handleCanvasTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleCanvasTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleCanvasEnd);
+
+            document.getElementById('zoomIn').addEventListener('click', () => {
+                state.zoom = Math.min(state.zoom + 2, 16);
+                document.getElementById('zoomLevel').textContent = state.zoom + 'x';
+                render();
+            });
+            document.getElementById('zoomOut').addEventListener('click', () => {
+                state.zoom = Math.max(state.zoom - 2, 2);
+                document.getElementById('zoomLevel').textContent = state.zoom + 'x';
+                render();
+            });
+            document.getElementById('gridToggle').addEventListener('click', () => {
+                state.grid = !state.grid;
+                render();
+            });
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+
+            document.getElementById('colorPicker').addEventListener('input', (e) => {
+                state.currentColor = e.target.value;
+                document.getElementById('currentColorPreview').style.background = e.target.value;
+            });
+            document.getElementById('addColorBtn').addEventListener('click', () => {
+                if (!state.palette.includes(state.currentColor) && state.palette.length < MAX_COLORS) {
+                    state.palette.push(state.currentColor);
+                    updatePalette();
+                    showToast('色を追加しました');
+                }
+            });
+
+            document.getElementById('loadImageBtn').addEventListener('click', () => {
+                document.getElementById('fileInput').click();
+            });
+            document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                initPixels();
+                render();
+                updateStats();
+                saveHistory();
+                showToast('クリアしました');
+            });
+            document.getElementById('exportBtn').addEventListener('click', exportData);
+
+            document.getElementById('cropCancel').addEventListener('click', () => {
+                document.getElementById('cropModal').classList.remove('active');
+            });
+            document.getElementById('cropConfirm').addEventListener('click', applyCrop);
+
+            document.getElementById('guideBtn').addEventListener('click', () => {
+                document.getElementById('guideModal').classList.add('active');
+            });
+            document.getElementById('guideClose').addEventListener('click', () => {
+                document.getElementById('guideModal').classList.remove('active');
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'z') {
+                    e.preventDefault();
+                    undo();
+                } else if (e.ctrlKey && e.key === 'y') {
+                    e.preventDefault();
+                    redo();
+                }
+            });
+        }
+
+        function getCanvasPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / state.zoom);
+            const y = Math.floor((e.clientY - rect.top) / state.zoom);
+            return { x, y };
+        }
+
+        function handleCanvasStart(e) {
+            state.isDrawing = true;
+            const pos = getCanvasPos(e);
+            state.lastX = pos.x;
+            state.lastY = pos.y;
+            applyTool(pos.x, pos.y);
+        }
+
+        function handleCanvasMove(e) {
+            if (!state.isDrawing) return;
+            const pos = getCanvasPos(e);
+            if (pos.x !== state.lastX || pos.y !== state.lastY) {
+                drawLine(state.lastX, state.lastY, pos.x, pos.y);
+                state.lastX = pos.x;
+                state.lastY = pos.y;
+            }
+        }
+
+        function handleCanvasEnd() {
+            if (state.isDrawing) {
+                state.isDrawing = false;
+                state.lastX = -1;
+                state.lastY = -1;
+                if (state.tool === 'pen' || state.tool === 'eraser' || state.tool === 'fill') {
+                    saveHistory();
+                }
+            }
+        }
+
+        function handleCanvasTouchStart(e) {
+            e.preventDefault();
+            const touch = e.touches[0];
+            state.isDrawing = true;
+            const pos = getCanvasPos(touch);
+            state.lastX = pos.x;
+            state.lastY = pos.y;
+            applyTool(pos.x, pos.y);
+        }
+
+        function handleCanvasTouchMove(e) {
+            e.preventDefault();
+            if (!state.isDrawing) return;
+            const touch = e.touches[0];
+            const pos = getCanvasPos(touch);
+            if (pos.x !== state.lastX || pos.y !== state.lastY) {
+                drawLine(state.lastX, state.lastY, pos.x, pos.y);
+                state.lastX = pos.x;
+                state.lastY = pos.y;
+            }
+        }
+
+        function drawLine(x0, y0, x1, y1) {
+            const dx = Math.abs(x1 - x0);
+            const dy = Math.abs(y1 - y0);
+            const sx = x0 < x1 ? 1 : -1;
+            const sy = y0 < y1 ? 1 : -1;
+            let err = dx - dy;
+
+            while (true) {
+                applyTool(x0, y0);
+                if (x0 === x1 && y0 === y1) break;
+                const e2 = 2 * err;
+                if (e2 > -dy) {
+                    err -= dy;
+                    x0 += sx;
+                }
+                if (e2 < dx) {
+                    err += dx;
+                    y0 += sy;
+                }
+            }
+        }
+
+        function applyTool(x, y) {
+            if (x < 0 || x >= state.size || y < 0 || y >= state.size) return;
+
+            if (state.tool === 'pen') {
+                applyBrush(x, y, state.currentColor);
+                render();
+                updateStats();
+            } else if (state.tool === 'eraser') {
+                applyBrush(x, y, null);
+                render();
+                updateStats();
+            } else if (state.tool === 'fill') {
+                floodFill(x, y, state.currentColor);
+                render();
+                updateStats();
+            } else if (state.tool === 'picker') {
+                const color = state.pixels[y][x];
+                if (color) {
+                    state.currentColor = color;
+                    document.getElementById('colorPicker').value = color;
+                    document.getElementById('currentColorPreview').style.background = color;
+                    showToast('色を取得: ' + color);
+                }
+            }
+        }
+
+        function applyBrush(cx, cy, color) {
+            const radius = Math.floor(state.penSize / 2);
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
+                    if (state.penSize === 1 || dx * dx + dy * dy <= radius * radius) {
+                        const nx = cx + dx;
+                        const ny = cy + dy;
+                        if (nx >= 0 && nx < state.size && ny >= 0 && ny < state.size) {
+                            state.pixels[ny][nx] = color;
+                        }
+                    }
+                }
+            }
+        }
+
+        function floodFill(startX, startY, fillColor) {
+            const targetColor = state.pixels[startY][startX];
+            if (targetColor === fillColor) return;
+            
+            const stack = [[startX, startY]];
+            const visited = new Set();
+            
+            while (stack.length > 0) {
+                const [x, y] = stack.pop();
+                const key = x + ',' + y;
+                
+                if (visited.has(key)) continue;
+                if (x < 0 || x >= state.size || y < 0 || y >= state.size) continue;
+                if (state.pixels[y][x] !== targetColor) continue;
+                
+                visited.add(key);
+                state.pixels[y][x] = fillColor;
+                
+                stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+            }
+        }
+
+        function render() {
+            canvas.width = state.size * state.zoom;
+            canvas.height = state.size * state.zoom;
+            
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const color = state.pixels[y][x];
+                    if (color) {
+                        ctx.fillStyle = color;
+                    } else {
+                        ctx.fillStyle = (x + y) % 2 === 0 ? '#444' : '#555';
+                    }
+                    ctx.fillRect(x * state.zoom, y * state.zoom, state.zoom, state.zoom);
+                }
+            }
+            
+            if (state.grid && state.zoom >= 4) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= state.size; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(i * state.zoom, 0);
+                    ctx.lineTo(i * state.zoom, state.size * state.zoom);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(0, i * state.zoom);
+                    ctx.lineTo(state.size * state.zoom, i * state.zoom);
+                    ctx.stroke();
+                }
+            }
+
+            updatePreviews();
+        }
+
+        function updatePreviews() {
+            const preview1x = document.getElementById('preview1x');
+            const preview2x = document.getElementById('preview2x');
+            
+            preview1x.width = state.size;
+            preview1x.height = state.size;
+            preview2x.width = state.size * 2;
+            preview2x.height = state.size * 2;
+            
+            const ctx1 = preview1x.getContext('2d');
+            const ctx2 = preview2x.getContext('2d');
+            
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const color = state.pixels[y][x];
+                    if (color) {
+                        ctx1.fillStyle = color;
+                        ctx1.fillRect(x, y, 1, 1);
+                        ctx2.fillStyle = color;
+                        ctx2.fillRect(x * 2, y * 2, 2, 2);
+                    }
+                }
+            }
+        }
+
+        function updatePalette() {
+            const grid = document.getElementById('paletteGrid');
+            grid.innerHTML = '';
+            
+            const transparentDiv = document.createElement('div');
+            transparentDiv.className = 'palette-color transparent-color';
+            transparentDiv.addEventListener('click', () => {
+                state.currentColor = null;
+                document.getElementById('currentColorPreview').style.background = 'linear-gradient(45deg, #666 25%, #888 25%, #888 50%, #666 50%, #666 75%, #888 75%)';
+                document.querySelectorAll('.palette-color').forEach(c => c.classList.remove('active'));
+                transparentDiv.classList.add('active');
+            });
+            grid.appendChild(transparentDiv);
+            
+            state.palette.forEach((color, index) => {
+                const colorDiv = document.createElement('div');
+                colorDiv.className = 'palette-color';
+                colorDiv.style.background = color;
+                if (color === state.currentColor) colorDiv.classList.add('active');
+                
+                colorDiv.addEventListener('click', () => {
+                    state.currentColor = color;
+                    document.getElementById('colorPicker').value = color;
+                    document.getElementById('currentColorPreview').style.background = color;
+                    document.querySelectorAll('.palette-color').forEach(c => c.classList.remove('active'));
+                    colorDiv.classList.add('active');
+                });
+                
+                let pressTimer;
+                colorDiv.addEventListener('mousedown', () => {
+                    pressTimer = setTimeout(() => {
+                        state.palette.splice(index, 1);
+                        updatePalette();
+                        showToast('色を削除しました');
+                    }, LONG_PRESS_DURATION);
+                });
+                colorDiv.addEventListener('mouseup', () => clearTimeout(pressTimer));
+                colorDiv.addEventListener('mouseleave', () => clearTimeout(pressTimer));
+                colorDiv.addEventListener('touchstart', () => {
+                    pressTimer = setTimeout(() => {
+                        state.palette.splice(index, 1);
+                        updatePalette();
+                        showToast('色を削除しました');
+                    }, LONG_PRESS_DURATION);
+                });
+                colorDiv.addEventListener('touchend', () => clearTimeout(pressTimer));
+                colorDiv.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    state.palette.splice(index, 1);
+                    updatePalette();
+                    showToast('色を削除しました');
+                });
+                
+                grid.appendChild(colorDiv);
+            });
+        }
+
+        function updateStats() {
+            const usedColors = new Set();
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    if (state.pixels[y][x]) {
+                        usedColors.add(state.pixels[y][x]);
+                    }
+                }
+            }
+            
+            document.getElementById('colorCount').textContent = usedColors.size;
+            
+            const { chunks } = generateExportData();
+            const totalChars = chunks.reduce((sum, c) => sum + c.length, 0);
+            
+            document.getElementById('totalChars').textContent = totalChars;
+            document.getElementById('sendCount').textContent = chunks.length;
+        }
+
+        function saveHistory() {
+            state.history = state.history.slice(0, state.historyIndex + 1);
+            state.history.push(JSON.parse(JSON.stringify(state.pixels)));
+            if (state.history.length > 50) state.history.shift();
+            state.historyIndex = state.history.length - 1;
+        }
+
+        function undo() {
+            if (state.historyIndex > 0) {
+                state.historyIndex--;
+                state.pixels = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+                render();
+                updateStats();
+            }
+        }
+
+        function redo() {
+            if (state.historyIndex < state.history.length - 1) {
+                state.historyIndex++;
+                state.pixels = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+                render();
+                updateStats();
+            }
+        }
+
+        let cropImage = null;
+        let cropCanvasRect = { width: 0, height: 0 };
+        let cropRect = { x: 0, y: 0, width: 100, height: 100 };
+        let cropScale = 1;
+        let cropDragging = null;
+        let cropDragStart = { x: 0, y: 0, rectX: 0, rectY: 0, rectW: 0, rectH: 0 };
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    cropImage = img;
+                    showCropModal(img);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        }
+
+        function showCropModal(img) {
+            const modal = document.getElementById('cropModal');
+            const cropCanvas = document.getElementById('cropCanvas');
+            const cropCtx = cropCanvas.getContext('2d');
+            
+            const maxW = window.innerWidth - 40;
+            const maxH = window.innerHeight * 0.5;
+            cropScale = Math.min(maxW / img.width, maxH / img.height, 1);
+            
+            cropCanvas.width = img.width * cropScale;
+            cropCanvas.height = img.height * cropScale;
+            cropCanvasRect = { width: cropCanvas.width, height: cropCanvas.height };
+            
+            cropCtx.drawImage(img, 0, 0, cropCanvas.width, cropCanvas.height);
+            
+            const size = Math.min(cropCanvas.width, cropCanvas.height);
+            cropRect = {
+                x: (cropCanvas.width - size) / 2,
+                y: (cropCanvas.height - size) / 2,
+                width: size,
+                height: size
+            };
+            
+            updateCropSelection();
+            setupCropEvents();
+            
+            modal.classList.add('active');
+        }
+
+        function updateCropSelection() {
+            const selection = document.getElementById('cropSelection');
+            selection.style.display = 'block';
+            selection.style.left = cropRect.x + 'px';
+            selection.style.top = cropRect.y + 'px';
+            selection.style.width = cropRect.width + 'px';
+            selection.style.height = cropRect.height + 'px';
+        }
+
+        function setupCropEvents() {
+            const wrapper = document.getElementById('cropWrapper');
+            const selection = document.getElementById('cropSelection');
+            
+            function getPos(e) {
+                const rect = wrapper.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            }
+            
+            function startDrag(e, type) {
+                e.preventDefault();
+                e.stopPropagation();
+                const pos = getPos(e);
+                cropDragging = type;
+                cropDragStart = {
+                    x: pos.x,
+                    y: pos.y,
+                    rectX: cropRect.x,
+                    rectY: cropRect.y,
+                    rectW: cropRect.width,
+                    rectH: cropRect.height
+                };
+            }
+            
+            const newSelection = selection.cloneNode(true);
+            selection.parentNode.replaceChild(newSelection, selection);
+            
+            const newHandles = newSelection.querySelectorAll('.crop-handle');
+            
+            newSelection.addEventListener('mousedown', (e) => {
+                if (e.target === newSelection) startDrag(e, 'move');
+            });
+            newSelection.addEventListener('touchstart', (e) => {
+                if (e.target === newSelection) startDrag(e, 'move');
+            }, { passive: false });
+            
+            newHandles.forEach(handle => {
+                handle.addEventListener('mousedown', (e) => startDrag(e, handle.dataset.handle));
+                handle.addEventListener('touchstart', (e) => startDrag(e, handle.dataset.handle), { passive: false });
+            });
+            
+            function onMove(e) {
+                if (!cropDragging) return;
+                e.preventDefault();
+                
+                const pos = getPos(e);
+                const dx = pos.x - cropDragStart.x;
+                const dy = pos.y - cropDragStart.y;
+                
+                const canvasW = cropCanvasRect.width;
+                const canvasH = cropCanvasRect.height;
+                
+                if (cropDragging === 'move') {
+                    let newX = cropDragStart.rectX + dx;
+                    let newY = cropDragStart.rectY + dy;
+                    
+                    newX = Math.max(0, Math.min(canvasW - cropRect.width, newX));
+                    newY = Math.max(0, Math.min(canvasH - cropRect.height, newY));
+                    
+                    cropRect.x = newX;
+                    cropRect.y = newY;
+                } else {
+                    let newX = cropDragStart.rectX;
+                    let newY = cropDragStart.rectY;
+                    let newW = cropDragStart.rectW;
+                    let newH = cropDragStart.rectH;
+                    
+                    if (cropDragging.includes('l')) {
+                        const maxDx = cropDragStart.rectW - 20;
+                        const clampedDx = Math.max(-cropDragStart.rectX, Math.min(maxDx, dx));
+                        newX = cropDragStart.rectX + clampedDx;
+                        newW = cropDragStart.rectW - clampedDx;
+                    }
+                    if (cropDragging.includes('r')) {
+                        const maxW = canvasW - cropDragStart.rectX;
+                        newW = Math.max(20, Math.min(maxW, cropDragStart.rectW + dx));
+                    }
+                    if (cropDragging.includes('t')) {
+                        const maxDy = cropDragStart.rectH - 20;
+                        const clampedDy = Math.max(-cropDragStart.rectY, Math.min(maxDy, dy));
+                        newY = cropDragStart.rectY + clampedDy;
+                        newH = cropDragStart.rectH - clampedDy;
+                    }
+                    if (cropDragging.includes('b')) {
+                        const maxH = canvasH - cropDragStart.rectY;
+                        newH = Math.max(20, Math.min(maxH, cropDragStart.rectH + dy));
+                    }
+                    
+                    const size = Math.max(20, Math.min(newW, newH));
+                    
+                    if (cropDragging.includes('l')) {
+                        newX = cropDragStart.rectX + cropDragStart.rectW - size;
+                        newX = Math.max(0, newX);
+                    }
+                    if (cropDragging.includes('t')) {
+                        newY = cropDragStart.rectY + cropDragStart.rectH - size;
+                        newY = Math.max(0, newY);
+                    }
+                    
+                    const finalSize = Math.min(size, canvasW - newX, canvasH - newY);
+                    
+                    cropRect.x = newX;
+                    cropRect.y = newY;
+                    cropRect.width = finalSize;
+                    cropRect.height = finalSize;
+                }
+                
+                updateCropSelection();
+            }
+            
+            function endDrag() {
+                cropDragging = null;
+            }
+            
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('mouseup', endDrag);
+            document.addEventListener('touchend', endDrag);
+        }
+
+        function applyCrop() {
+            if (!cropImage) return;
+            
+            const srcX = cropRect.x / cropScale;
+            const srcY = cropRect.y / cropScale;
+            const srcW = cropRect.width / cropScale;
+            const srcH = cropRect.height / cropScale;
+            
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = state.size;
+            tempCanvas.height = state.size;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.imageSmoothingEnabled = false;
+            tempCtx.drawImage(cropImage, srcX, srcY, srcW, srcH, 0, 0, state.size, state.size);
+            
+            const imageData = tempCtx.getImageData(0, 0, state.size, state.size);
+            const pixels = imageData.data;
+            
+            const colorMap = new Map();
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i + 3] < 128) continue;
+                const hex = rgbToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
+                colorMap.set(hex, (colorMap.get(hex) || 0) + 1);
+            }
+            
+            let reducedPalette = Array.from(colorMap.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, state.maxColors)
+                .map(e => e[0]);
+            
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const i = (y * state.size + x) * 4;
+                    if (pixels[i + 3] < 128) {
+                        state.pixels[y][x] = null;
+                    } else {
+                        const hex = rgbToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
+                        state.pixels[y][x] = findClosestColor(hex, reducedPalette);
+                    }
+                }
+            }
+            
+            state.palette = reducedPalette;
+            updatePalette();
+            
+            document.getElementById('cropModal').classList.remove('active');
+            render();
+            updateStats();
+            saveHistory();
+            showToast('画像を変換しました');
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function findClosestColor(hex, palette) {
+            if (palette.includes(hex)) return hex;
+            
+            const rgb = hexToRgb(hex);
+            let closest = palette[0];
+            let minDist = Infinity;
+            
+            for (const pHex of palette) {
+                const pRgb = hexToRgb(pHex);
+                const dist = Math.pow(rgb.r - pRgb.r, 2) + Math.pow(rgb.g - pRgb.g, 2) + Math.pow(rgb.b - pRgb.b, 2);
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = pHex;
+                }
+            }
+            return closest;
+        }
+
+        function splitPaletteString(paletteStr, maxSize) {
+            const chunks = [];
+            const entries = paletteStr.split(',').filter(s => s.length > 0);
+            let currentChunk = '';
+            
+            for (const entry of entries) {
+                const toAdd = currentChunk.length > 0 ? ',' + entry : entry;
+                if (currentChunk.length + toAdd.length + 1 > maxSize && currentChunk.length > 0) {
+                    chunks.push(currentChunk + ',');
+                    currentChunk = entry;
+                } else {
+                    currentChunk += toAdd;
+                }
+            }
+            if (currentChunk.length > 0) {
+                chunks.push(currentChunk + ',');
+            }
+            return chunks;
+        }
+
+        function generateExportData() {
+            const usedColors = new Set();
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    if (state.pixels[y][x]) {
+                        usedColors.add(state.pixels[y][x]);
+                    }
+                }
+            }
+            
+            const colorToChar = new Map();
+            let charIndex = 0;
+            for (const color of usedColors) {
+                if (charIndex < COLOR_CHARS.length) {
+                    colorToChar.set(color, COLOR_CHARS[charIndex++]);
+                }
+            }
+            
+            let paletteStr = '';
+            for (const [color, char] of colorToChar) {
+                paletteStr += char + ':' + color.substring(1) + ',';
+            }
+            
+            let pixelData = '';
+            let currentChar = null;
+            let count = 0;
+            
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const color = state.pixels[y][x];
+                    const char = color ? colorToChar.get(color) : TRANSPARENT_CHAR;
+                    
+                    if (char === currentChar) {
+                        count++;
+                    } else {
+                        if (currentChar !== null) {
+                            pixelData += count > 1 ? count + currentChar : currentChar;
+                        }
+                        currentChar = char;
+                        count = 1;
+                    }
+                }
+            }
+            if (currentChar !== null) {
+                pixelData += count > 1 ? count + currentChar : currentChar;
+            }
+            
+            const chunks = [];
+            const paletteHeader = '\n\n【パレット定義】\n';
+            
+            const explanation = `【ドット絵データ】
+サイズ: ${state.size}x${state.size}
+色数: ${usedColors.size}色
+形式: RLE圧縮
+
+【デコード方法】
+・パレット: 文字:色コード（例: A:FF0000 → Aは赤）
+・データ: 数字+文字 → その文字が数字回連続（例: 5A → Aが5回）
+・数字なし → 1回（例: A → Aが1回）
+・${TRANSPARENT_CHAR} → 透明
+
+【送信マーカー】
+・【送信開始】→ この後からピクセルデータ開始
+・【送信完了】→ データ終了、画像を生成して表示`;
+
+            if (explanation.length + paletteHeader.length + paletteStr.length <= MAX_CHUNK_SIZE) {
+                chunks.push(explanation + paletteHeader + paletteStr);
+                
+                let remaining = '【送信開始】\n' + state.size + '|' + pixelData;
+                while (remaining.length > 0) {
+                    let chunk = remaining.substring(0, MAX_CHUNK_SIZE);
+                    remaining = remaining.substring(MAX_CHUNK_SIZE);
+                    
+                    if (remaining.length === 0) {
+                        chunk += '\n【送信完了】';
+                    }
+                    chunks.push(chunk);
+                }
+            } else {
+                chunks.push(explanation);
+                
+                const paletteChunks = splitPaletteString(paletteStr, MAX_CHUNK_SIZE - 20);
+                paletteChunks.forEach((pc, i) => {
+                    if (i === 0) {
+                        chunks.push('【パレット定義】\n' + pc);
+                    } else {
+                        chunks.push(pc);
+                    }
+                });
+                
+                let remaining = '【送信開始】\n' + state.size + '|' + pixelData;
+                while (remaining.length > 0) {
+                    let chunk = remaining.substring(0, MAX_CHUNK_SIZE);
+                    remaining = remaining.substring(MAX_CHUNK_SIZE);
+                    
+                    if (remaining.length === 0) {
+                        chunk += '\n【送信完了】';
+                    }
+                    chunks.push(chunk);
+                }
+            }
+            
+            return { chunks, paletteStr, pixelData };
+        }
+
+        function exportData() {
+            const { chunks } = generateExportData();
+            
+            const container = document.getElementById('chunkContainer');
+            container.innerHTML = '';
+            
+            chunks.forEach((chunk, index) => {
+                const item = document.createElement('div');
+                item.className = 'chunk-item';
+                
+                let label = '';
+                if (index === 0) {
+                    if (chunk.includes('【パレット定義】')) {
+                        label = `送信 ${index + 1}/${chunks.length} (説明+パレット)`;
+                    } else {
+                        label = `送信 ${index + 1}/${chunks.length} (説明)`;
+                    }
+                } else if (chunk.includes('【送信開始】')) {
+                    label = `送信 ${index + 1}/${chunks.length} (データ開始)`;
+                } else if (chunk.includes('【送信完了】')) {
+                    label = `送信 ${index + 1}/${chunks.length} (最終)`;
+                } else if (chunk.includes('【パレット定義】')) {
+                    label = `送信 ${index + 1}/${chunks.length} (パレット)`;
+                } else if (!chunk.includes('|') && !chunk.includes('【') && chunk.includes(':')) {
+                    label = `送信 ${index + 1}/${chunks.length} (パレット続き)`;
+                } else {
+                    label = `送信 ${index + 1}/${chunks.length} (データ)`;
+                }
+                
+                item.innerHTML = `
+                    <div class="chunk-header">
+                        <span class="chunk-label">${label} - ${chunk.length}文字</span>
+                        <button class="chunk-copy-btn" onclick="copyChunk(${index})">コピー</button>
+                    </div>
+                    <textarea class="chunk-text" readonly id="chunk${index}">${chunk}</textarea>
+                `;
+                container.appendChild(item);
+            });
+            
+            document.getElementById('exportSection').style.display = 'block';
+            showToast(`${chunks.length}回で送信できます`);
+        }
+
+        window.copyChunk = function(index) {
+            const textarea = document.getElementById('chunk' + index);
+            textarea.select();
+            document.execCommand('copy');
+            showToast('コピーしました');
+        };
+
+        window.copyPromptText = function(btn) {
+            const promptText = btn.parentElement.querySelector('.prompt-text').textContent;
+            navigator.clipboard.writeText(promptText).then(() => {
+                btn.textContent = '✓';
+                setTimeout(() => btn.textContent = 'コピー', 1000);
+            }).catch(() => {
+                const textarea = document.createElement('textarea');
+                textarea.value = promptText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                btn.textContent = '✓';
+                setTimeout(() => btn.textContent = 'コピー', 1000);
+            });
+            showToast('コピーしました');
+        };
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        init();
+    </script>
+</body>
+</html>
