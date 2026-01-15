@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gravity サウンドエディタ</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 70px 10px 20px 10px;
+            overflow-x: hidden;
+        }
+        
+        .container { max-width: 100%; margin: 0 auto; }
+        
+        h1 {
+            text-align: center;
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #0ff;
+        }
+        
+        .main-tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+        
+        .main-tab {
+            flex: 1; padding: 12px; background: #333;
+            border: 2px solid #555; border-radius: 10px 10px 0 0;
+            text-align: center; cursor: pointer; font-size: 1em; font-weight: bold;
+        }
+        
+        .main-tab.active {
+            background: linear-gradient(180deg, #0a3a3a 0%, #1a1a2e 100%);
+            border-color: #0ff; border-bottom-color: transparent;
+        }
+        
+        .main-tab.bgm-tab { color: #f0f; }
+        .main-tab.se-tab { color: #0f0; }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .controls {
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px; padding: 10px; margin-bottom: 10px;
+        }
+        
+        .control-row {
+            display: flex; gap: 10px; margin-bottom: 8px;
+            flex-wrap: wrap; align-items: center;
+        }
+        
+        .control-group { display: flex; align-items: center; gap: 5px; }
+        
+        label { font-size: 0.8em; color: #0ff; }
+        
+        input[type="range"] { width: 80px; height: 20px; }
+        
+        input[type="number"] {
+            width: 60px; background: #333; border: 1px solid #0ff;
+            color: #fff; padding: 3px; border-radius: 3px;
+        }
+        
+        input[type="text"] {
+            background: #333; border: 1px solid #0ff;
+            color: #fff; padding: 5px 8px; border-radius: 3px; font-size: 0.85em;
+        }
+        
+        select {
+            background: #333; border: 1px solid #0ff;
+            color: #fff; padding: 5px; border-radius: 5px; font-size: 0.85em;
+        }
+        
+        button {
+            background: linear-gradient(180deg, #0ff 0%, #088 100%);
+            border: none; color: #000; padding: 8px 15px;
+            border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 0.9em;
+        }
+        
+        button:active { transform: scale(0.95); }
+        button.stop-btn { background: linear-gradient(180deg, #f55 0%, #a00 100%); color: #fff; }
+        button.add-btn { background: linear-gradient(180deg, #0f0 0%, #080 100%); color: #000; }
+        button.delete-btn { background: linear-gradient(180deg, #f55 0%, #a00 100%); color: #fff; padding: 5px 10px; font-size: 0.8em; }
+        
+        .track-tabs { display: flex; gap: 5px; margin-bottom: 10px; }
+        
+        .track-tab {
+            flex: 1; padding: 10px 5px; background: #333;
+            border: 2px solid #555; border-radius: 8px 8px 0 0;
+            text-align: center; cursor: pointer; font-size: 0.8em;
+        }
+        
+        .track-tab.active { border-color: #0ff; background: #0a3a3a; }
+        .track-tab.melody { border-top-color: #f0f; }
+        .track-tab.bass { border-top-color: #0f0; }
+        .track-tab.drum { border-top-color: #ff0; }
+        
+        .effects-panel {
+            background: rgba(0,50,50,0.5);
+            border-radius: 8px; padding: 8px; margin-bottom: 10px;
+        }
+        
+        .effects-row { display: flex; gap: 15px; flex-wrap: wrap; }
+        
+        .effect-item { display: flex; align-items: center; gap: 5px; }
+        .effect-item input[type="range"] { width: 60px; }
+        
+        .edit-tools {
+            display: flex; gap: 5px; margin-bottom: 10px;
+            flex-wrap: wrap; align-items: center;
+        }
+        
+        .tool-group { display: flex; gap: 3px; align-items: center; }
+        .tool-separator { width: 1px; height: 24px; background: #555; margin: 0 5px; }
+        
+        .tool-btn {
+            padding: 6px 10px; font-size: 0.75em;
+            background: #444; border: 1px solid #666;
+        }
+        
+        .tool-btn.active { background: #0aa; border-color: #0ff; }
+        
+        .piano-roll-container {
+            position: relative; background: #111;
+            border-radius: 10px; overflow: hidden; margin-bottom: 10px;
+        }
+        
+        .scroll-control {
+            background: rgba(0,0,0,0.8);
+            padding: 8px 10px; display: flex;
+            align-items: center; gap: 10px; border-bottom: 1px solid #333;
+        }
+        
+        .scroll-control label { font-size: 0.75em; color: #0ff; white-space: nowrap; }
+        
+        .scroll-slider {
+            flex: 1; height: 20px; -webkit-appearance: none;
+            background: #333; border-radius: 10px; outline: none;
+        }
+        
+        .scroll-slider::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 40px; height: 18px;
+            background: linear-gradient(180deg, #0ff 0%, #088 100%);
+            border-radius: 8px; cursor: pointer;
+        }
+        
+        .scroll-slider::-moz-range-thumb {
+            width: 40px; height: 18px;
+            background: linear-gradient(180deg, #0ff 0%, #088 100%);
+            border-radius: 8px; cursor: pointer; border: none;
+        }
+        
+        .piano-roll-scroll {
+            overflow: hidden; max-height: 300px; position: relative;
+        }
+        
+        .piano-roll {
+            display: flex; min-width: max-content;
+            user-select: none; position: relative;
+        }
+        
+        .piano-keys {
+            position: sticky; left: 0; z-index: 10; background: #222;
+        }
+        
+        .piano-key {
+            height: 20px; display: flex; align-items: center;
+            justify-content: flex-end; padding-right: 3px;
+            font-size: 0.6em; border-bottom: 1px solid #333; cursor: pointer;
+        }
+        
+        .piano-key.white {
+            background: linear-gradient(90deg, #eee 0%, #fff 100%);
+            color: #000; width: 45px;
+        }
+        
+        .piano-key.black {
+            background: linear-gradient(90deg, #222 0%, #444 100%);
+            color: #fff; width: 35px;
+        }
+        
+        .piano-key.octave-start {
+            border-top: 2px solid #0ff;
+        }
+        
+        .grid-wrapper { position: relative; overflow: hidden; }
+        
+        .grid { display: flex; flex-direction: column; }
+        .grid-row { display: flex; height: 20px; }
+        
+        .grid-cell {
+            width: 20px; height: 20px; border: 1px solid #333;
+            cursor: pointer; flex-shrink: 0;
+        }
+        
+        .grid-cell:hover { background: rgba(0,255,255,0.2); }
+        
+        .grid-cell.active {
+            background: linear-gradient(135deg, #f0f 0%, #a0a 100%);
+            box-shadow: 0 0 5px #f0f;
+        }
+        
+        .grid-cell.bass-active {
+            background: linear-gradient(135deg, #0f0 0%, #0a0 100%);
+            box-shadow: 0 0 5px #0f0;
+        }
+        
+        .grid-cell.beat-start { border-left: 2px solid #555; }
+        .grid-cell.bar-start { border-left: 2px solid #0ff; }
+        .grid-cell.selected { outline: 2px solid #ff0; outline-offset: -2px; }
+        .grid-cell.in-selection { background: rgba(255,255,0,0.3) !important; }
+        
+        .drum-row-label {
+            width: 45px; height: 22px; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 0.65em; background: #333;
+            border-bottom: 1px solid #444;
+            position: sticky; left: 0; z-index: 10; flex-shrink: 0;
+        }
+        
+        .grid-cell.drum-active {
+            background: linear-gradient(135deg, #ff0 0%, #aa0 100%);
+            box-shadow: 0 0 5px #ff0;
+        }
+        
+        .drum-grid .grid-row { height: 22px; }
+        .drum-grid .grid-cell { height: 22px; }
+        
+        .drum-patterns {
+            background: rgba(50,50,0,0.3);
+            border-radius: 8px; padding: 8px; margin-bottom: 10px;
+        }
+        .drum-patterns label { color: #ff0; }
+        
+        .mixer {
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px; padding: 10px; margin-bottom: 10px;
+        }
+        
+        .mixer-track {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+        }
+        
+        .mixer-label { width: 70px; font-size: 0.8em; }
+        .mixer-track input[type="range"] { flex: 1; max-width: 150px; }
+        
+        .mute-btn { padding: 3px 8px; font-size: 0.7em; background: #555; }
+        .mute-btn.muted { background: #a00; }
+        
+        .export-section {
+            background: rgba(0,50,0,0.5);
+            border-radius: 10px; padding: 10px;
+        }
+        
+        .export-section h3 { font-size: 0.9em; margin-bottom: 8px; color: #0f0; }
+        
+        .export-output {
+            background: #000; border: 1px solid #0f0;
+            border-radius: 5px; padding: 10px; font-size: 0.7em;
+            max-height: 150px; overflow: auto;
+            white-space: pre-wrap; word-break: break-all;
+            margin-bottom: 10px; -webkit-overflow-scrolling: touch;
+        }
+        
+        .export-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+        .char-count { font-size: 0.75em; color: #0ff; margin-top: 5px; }
+        
+        .chunk-nav {
+            display: flex; gap: 10px; align-items: center;
+            margin-top: 10px; flex-wrap: wrap;
+        }
+        .chunk-nav button { padding: 5px 10px; font-size: 0.8em; }
+        .chunk-info { font-size: 0.8em; color: #ff0; }
+        
+        .selection-info { font-size: 0.75em; color: #ff0; margin-left: 10px; }
+        .note-count { font-size: 0.7em; color: #888; }
+        
+        .selection-rect {
+            position: absolute; border: 2px dashed #ff0;
+            background: rgba(255,255,0,0.1); pointer-events: none; z-index: 100;
+        }
+        
+        .se-list {
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px; padding: 10px; margin-bottom: 10px;
+        }
+        .se-list h3 { font-size: 0.9em; margin-bottom: 10px; color: #0f0; }
+        
+        .se-item {
+            background: rgba(0,50,0,0.3); border: 1px solid #0f0;
+            border-radius: 8px; padding: 10px; margin-bottom: 10px;
+        }
+        .se-item.error { border-color: #f55; }
+        
+        .se-item-header {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 10px;
+        }
+        .se-item-name { font-weight: bold; color: #0f0; font-size: 1em; }
+        .se-item-controls { display: flex; gap: 5px; }
+        .se-item-body { display: flex; flex-direction: column; gap: 8px; }
+        
+        .se-param-row {
+            display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+        }
+        .se-param { display: flex; align-items: center; gap: 5px; }
+        .se-param label { font-size: 0.75em; color: #0ff; min-width: 50px; }
+        .se-param input[type="range"] { width: 70px; }
+        .se-param select { font-size: 0.8em; }
+        
+        .se-usage { display: flex; align-items: center; gap: 5px; margin-top: 5px; }
+        .se-usage label { font-size: 0.75em; color: #ff0; }
+        .se-usage input[type="text"] { flex: 1; max-width: 200px; }
+        .se-usage input.error { border-color: #f55; background: rgba(255,0,0,0.2); }
+        
+        .se-preview-btn {
+            padding: 5px 15px; font-size: 0.8em;
+            background: linear-gradient(180deg, #f0f 0%, #808 100%); color: #fff;
+        }
+        
+        .se-add-section { text-align: center; padding: 10px; }
+        
+        .se-presets {
+            background: rgba(50,0,50,0.3);
+            border-radius: 8px; padding: 10px; margin-bottom: 10px;
+        }
+        .se-presets h4 { font-size: 0.85em; color: #f0f; margin-bottom: 8px; }
+        .se-preset-btns { display: flex; flex-wrap: wrap; gap: 5px; }
+        
+        .se-preset-btn {
+            padding: 5px 10px; font-size: 0.75em;
+            background: #444; border: 1px solid #f0f; color: #fff;
+        }
+        .se-preset-btn:hover { background: #606; }
+        
+        .param-value { font-size: 0.7em; color: #888; min-width: 30px; text-align: center; }
+        
+        .toast {
+            position: fixed; bottom: 20px; left: 50%;
+            transform: translateX(-50%); background: #f55; color: #fff;
+            padding: 12px 24px; border-radius: 8px; z-index: 1000;
+            font-size: 0.9em; box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .toast.show { opacity: 1; }
+        .toast.success { background: #0a0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Gravity サウンドエディタ 🎵</h1>
+        
+        <div class="main-tabs">
+            <div class="main-tab bgm-tab active" data-tab="bgm">🎵 BGM</div>
+            <div class="main-tab se-tab" data-tab="se">🔊 SE（効果音）</div>
+        </div>
+        
+        <div class="tab-content active" id="bgmTab">
+            <div class="controls">
+                <div class="control-row">
+                    <div class="control-group">
+                        <label>BPM:</label>
+                        <input type="number" id="bpm" value="120" min="60" max="200">
+                    </div>
+                    <div class="control-group">
+                        <label>小節:</label>
+                        <select id="bars">
+                            <option value="4">4小節</option>
+                            <option value="8" selected>8小節</option>
+                            <option value="16">16小節</option>
+                            <option value="32">32小節</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>プリセット:</label>
+                        <select id="preset">
+                            <option value="">--選択--</option>
+                            <option value="battle">🗡️ バトル</option>
+                            <option value="field">🌳 フィールド</option>
+                            <option value="dungeon">🏰 ダンジョン</option>
+                            <option value="boss">👹 ボス戦</option>
+                            <option value="victory">🏆 勝利</option>
+                            <option value="shop">🛒 ショップ</option>
+                            <option value="title">🎬 タイトル</option>
+                            <option value="gameover">💀 ゲームオーバー</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control-row">
+                    <button id="playBtn">▶️ 再生</button>
+                    <button id="stopBtn" class="stop-btn">⏹ 停止</button>
+                    <label><input type="checkbox" id="loopChk" checked> ループ</label>
+                </div>
+            </div>
+            
+            <div class="effects-panel">
+                <div class="effects-row">
+                    <div class="effect-item"><label>リバーブ:</label><input type="range" id="reverb" min="0" max="100" value="20"></div>
+                    <div class="effect-item"><label>ディレイ:</label><input type="range" id="delay" min="0" max="100" value="0"></div>
+                    <div class="effect-item"><label>ビブラート:</label><input type="range" id="vibrato" min="0" max="100" value="0"></div>
+                    <div class="effect-item"><label>スウィング:</label><input type="range" id="swing" min="0" max="100" value="0"></div>
+                </div>
+            </div>
+            
+            <div class="edit-tools">
+                <div class="tool-group">
+                    <button class="tool-btn active" data-tool="pen">✏️ ペン</button>
+                    <button class="tool-btn" data-tool="eraser">🧹 消し</button>
+                    <button class="tool-btn" data-tool="select">☐ 選択</button>
+                </div>
+                <div class="tool-separator"></div>
+                <div class="tool-group">
+                    <button class="tool-btn" id="undoBtn">↩️</button>
+                    <button class="tool-btn" id="redoBtn">↪️</button>
+                </div>
+                <div class="tool-separator"></div>
+                <div class="tool-group">
+                    <button class="tool-btn" id="copyBtn">📋</button>
+                    <button class="tool-btn" id="pasteBtn">📄</button>
+                    <button class="tool-btn" id="deleteBtn">🗑️</button>
+                </div>
+                <div class="tool-separator"></div>
+                <div class="tool-group">
+                    <button class="tool-btn" id="transposeUp">🔼</button>
+                    <button class="tool-btn" id="transposeDown">🔽</button>
+                    <button class="tool-btn" id="reverseBtn">🔄</button>
+                    <button class="tool-btn" id="randomBtn">🎲</button>
+                </div>
+                <span class="selection-info" id="selectionInfo"></span>
+            </div>
+            
+            <div class="track-tabs">
+                <div class="track-tab melody active" data-track="melody">🎵 メロディ <span class="note-count" id="melodyCount">(0)</span></div>
+                <div class="track-tab bass" data-track="bass">🎸 ベース <span class="note-count" id="bassCount">(0)</span></div>
+                <div class="track-tab drum" data-track="drum">🥁 ドラム <span class="note-count" id="drumCount">(0)</span></div>
+            </div>
+            
+            <div class="controls" id="toneSelect" style="margin-bottom:10px;">
+                <div class="control-row">
+                    <div class="control-group">
+                        <label>音色:</label>
+                        <select id="melodyTone">
+                            <optgroup label="8bit 基本">
+                                <option value="square">矩形波</option>
+                                <option value="triangle">三角波</option>
+                                <option value="sawtooth">ノコギリ波</option>
+                                <option value="sine">サイン波</option>
+                            </optgroup>
+                            <optgroup label="シンセ">
+                                <option value="detune">デチューン</option>
+                                <option value="fifth">5度重ね</option>
+                                <option value="octave">オクターブ</option>
+                                <option value="supersaw">スーパーソウ</option>
+                            </optgroup>
+                            <optgroup label="鍵盤">
+                                <option value="piano">ピアノ</option>
+                                <option value="epiano">エレピ</option>
+                                <option value="organ">オルガン</option>
+                            </optgroup>
+                            <optgroup label="その他">
+                                <option value="bell">ベル</option>
+                                <option value="guitar">ギター</option>
+                                <option value="strings">ストリングス</option>
+                                <option value="brass">ブラス</option>
+                                <option value="flute">フルート</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="control-group" id="bassToneGroup" style="display:none;">
+                        <label>ベース音色:</label>
+                        <select id="bassTone">
+                            <option value="triangle">三角波</option>
+                            <option value="square">矩形波</option>
+                            <option value="sine">サイン波</option>
+                            <option value="sawtooth">ノコギリ波</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="drum-patterns" id="drumPatterns" style="display:none;">
+                <div class="control-row">
+                    <label>ドラムパターン:</label>
+                    <select id="drumPattern">
+                        <option value="">--選択--</option>
+                        <option value="rock">Rock</option>
+                        <option value="pop">Pop</option>
+                        <option value="disco">Disco</option>
+                        <option value="hiphop">HipHop</option>
+                        <option value="techno">Techno</option>
+                    </select>
+                    <button id="applyDrumPattern">適用</button>
+                </div>
+            </div>
+            
+            <div class="piano-roll-container">
+                <div class="scroll-control">
+                    <label>◀ 横 ▶</label>
+                    <input type="range" class="scroll-slider" id="scrollSliderX" min="0" max="100" value="0">
+                    <label>▲ 縦 ▼</label>
+                    <input type="range" class="scroll-slider" id="scrollSliderY" min="0" max="100" value="50" style="width:60px;">
+                </div>
+                <div class="piano-roll-scroll" id="pianoRollScroll">
+                    <div class="piano-roll" id="pianoRoll"></div>
+                </div>
+            </div>
+            
+            <div class="mixer">
+                <div class="mixer-track"><span class="mixer-label">🎵 メロディ</span><input type="range" id="melodyVol" min="0" max="100" value="80"><button class="mute-btn" data-track="melody">M</button></div>
+                <div class="mixer-track"><span class="mixer-label">🎸 ベース</span><input type="range" id="bassVol" min="0" max="100" value="70"><button class="mute-btn" data-track="bass">M</button></div>
+                <div class="mixer-track"><span class="mixer-label">🥁 ドラム</span><input type="range" id="drumVol" min="0" max="100" value="75"><button class="mute-btn" data-track="drum">M</button></div>
+            </div>
+            
+            <div class="export-section">
+                <h3>📤 Gravity送信用データ</h3>
+                <button id="generateBtn">データ生成</button>
+                <div class="char-count" id="charCount">文字数: 0</div>
+                <div class="export-output" id="exportOutput">ここに生成データが表示されます</div>
+                <div class="chunk-nav" id="chunkNav" style="display:none;">
+                    <button id="prevChunk">◀ 前</button>
+                    <span class="chunk-info" id="chunkInfo">1/1</span>
+                    <button id="nextChunk">次 ▶</button>
+                </div>
+                <div class="export-buttons"><button id="copyDataBtn">📋 コピー</button></div>
+            </div>
+        </div>
+        
+        <div class="tab-content" id="seTab">
+            <div class="se-presets">
+                <h4>🎯 プリセットから追加</h4>
+                <div class="se-preset-btns">
+                    <button class="se-preset-btn" data-preset="jump">ジャンプ</button>
+                    <button class="se-preset-btn" data-preset="coin">コイン</button>
+                    <button class="se-preset-btn" data-preset="damage">ダメージ</button>
+                    <button class="se-preset-btn" data-preset="explosion">爆発</button>
+                    <button class="se-preset-btn" data-preset="laser">レーザー</button>
+                    <button class="se-preset-btn" data-preset="powerup">パワーアップ</button>
+                    <button class="se-preset-btn" data-preset="select">選択</button>
+                    <button class="se-preset-btn" data-preset="cancel">キャンセル</button>
+                    <button class="se-preset-btn" data-preset="hit">ヒット</button>
+                    <button class="se-preset-btn" data-preset="sword">剣</button>
+                </div>
+            </div>
+            
+            <div class="se-list">
+                <h3>🔊 SE一覧 <span id="seCount">(0個)</span></h3>
+                <div id="seListContainer"></div>
+                <div class="se-add-section"><button class="add-btn" id="addSeBtn">＋ 新規SE追加</button></div>
+            </div>
+            
+            <div class="export-section">
+                <h3>📤 Gravity送信用データ</h3>
+                <button id="generateSeBtn">データ生成</button>
+                <div class="char-count" id="seCharCount">文字数: 0</div>
+                <div class="export-output" id="seExportOutput">ここに生成データが表示されます</div>
+                <div class="export-buttons"><button id="copySeDataBtn">📋 コピー</button></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const OCTAVES = [6, 5, 4, 3, 2]; // 5オクターブに拡張
+        const SUBDIVISIONS = 4;
+        const DRUM_NAMES = ['kick', 'snare', 'hihat', 'ohh', 'tomH', 'tomL', 'clap', 'rim', 'cymbal', 'cowbell'];
+        const DRUM_LABELS = ['K kick', 'S snare', 'H hihat', 'O ohh', 'T tomH', 'L tomL', 'C clap', 'R rim', 'Y cymbal', 'B cowbell'];
+        const DRUM_ENCODE = { kick:'K', snare:'S', hihat:'H', ohh:'O', tomH:'T', tomL:'L', clap:'C', rim:'R', cymbal:'Y', cowbell:'B' };
+        const MAX_CHARS = 1000;
+        const CELL_WIDTH = 20, CELL_HEIGHT = 20, DRUM_CELL_HEIGHT = 22, KEYS_WIDTH = 45;
+        
+        let audioCtx = null;
+        const getAudioContext = () => audioCtx || (audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+        
+        const showToast = (msg, type = 'error') => {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show' + (type === 'success' ? ' success' : '');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        };
+        
+        const bgmState = {
+            bpm: 120, bars: 8, currentTrack: 'melody', currentTool: 'pen',
+            melodyNotes: {}, bassNotes: {}, drumNotes: {},
+            melodyTone: 'square', bassTone: 'triangle',
+            volumes: { melody: 0.8, bass: 0.7, drum: 0.75 },
+            muted: { melody: false, bass: false, drum: false },
+            effects: { reverb: 0.2, delay: 0, vibrato: 0, swing: 0 },
+            isPlaying: false, loop: true,
+            selection: new Set(), clipboard: null, clipboardTrack: null,
+            history: [], historyIndex: -1, chunks: [], currentChunk: 0,
+            isDragging: false, isSelecting: false,
+            selectStartX: 0, selectStartY: 0, selectCurrentX: 0, selectCurrentY: 0,
+            scrollX: 0, scrollY: 0
+        };
+        
+        let playInterval = null, currentStep = 0;
+        
+        const seState = { items: [] };
+        let seIdCounter = 0;
+        
+        const SE_PRESETS = {
+            jump: { type: 'tone', wave: 'square', pitch: 1.5, duration: 0.15, curve: 'up', decay: 0.8, noise: 0 },
+            coin: { type: 'tone', wave: 'square', pitch: 2.0, duration: 0.1, curve: 'up', decay: 0.5, noise: 0 },
+            damage: { type: 'noise', wave: 'sawtooth', pitch: 0.5, duration: 0.3, curve: 'down', decay: 0.9, noise: 0.8 },
+            explosion: { type: 'noise', wave: 'sawtooth', pitch: 0.3, duration: 0.5, curve: 'down', decay: 0.95, noise: 1.0 },
+            laser: { type: 'tone', wave: 'sawtooth', pitch: 1.2, duration: 0.2, curve: 'down', decay: 0.7, noise: 0.1 },
+            powerup: { type: 'tone', wave: 'sine', pitch: 1.0, duration: 0.4, curve: 'up', decay: 0.6, noise: 0 },
+            select: { type: 'tone', wave: 'square', pitch: 1.8, duration: 0.05, curve: 'none', decay: 0.5, noise: 0 },
+            cancel: { type: 'tone', wave: 'square', pitch: 0.8, duration: 0.1, curve: 'down', decay: 0.6, noise: 0.1 },
+            hit: { type: 'noise', wave: 'square', pitch: 0.6, duration: 0.1, curve: 'down', decay: 0.8, noise: 0.5 },
+            sword: { type: 'noise', wave: 'sawtooth', pitch: 1.0, duration: 0.15, curve: 'down', decay: 0.7, noise: 0.6 }
+        };
+        
+        const noteToFreq = n => {
+            const m = n.match(/^([A-G]#?)(\d)$/);
+            if (!m) return 440;
+            return 440 * Math.pow(2, ((parseInt(m[2]) + 1) * 12 + NOTE_NAMES.indexOf(m[1]) - 69) / 12);
+        };
+        
+        const createOscillator = (freq, type, time, dur, vol) => {
+            const ctx = getAudioContext();
+            const g = ctx.createGain();
+            g.connect(ctx.destination);
+            g.gain.setValueAtTime(vol * 0.3, time);
+            g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+            const o = ctx.createOscillator();
+            o.type = ['square'].includes(type) ? 'square' : type === 'triangle' ? 'triangle' : ['sawtooth','supersaw'].includes(type) ? 'sawtooth' : 'sine';
+            o.frequency.setValueAtTime(freq, time);
+            o.connect(g); o.start(time); o.stop(time + dur);
+            if (['detune','fifth','octave','supersaw'].includes(type)) {
+                const o2 = ctx.createOscillator();
+                o2.type = o.type;
+                o2.frequency.setValueAtTime(freq * (type === 'detune' ? 1.005 : type === 'fifth' ? 1.5 : 2), time);
+                const g2 = ctx.createGain();
+                g2.gain.setValueAtTime(vol * 0.2, time);
+                g2.gain.exponentialRampToValueAtTime(0.001, time + dur);
+                o2.connect(g2); g2.connect(ctx.destination);
+                o2.start(time); o2.stop(time + dur);
+            }
+        };
+        
+        const playDrum = (type, time, vol) => {
+            const ctx = getAudioContext();
+            const g = ctx.createGain();
+            g.connect(ctx.destination);
+            if (type === 'kick') {
+                const o = ctx.createOscillator(); o.type = 'sine';
+                o.frequency.setValueAtTime(150, time);
+                o.frequency.exponentialRampToValueAtTime(30, time + 0.1);
+                g.gain.setValueAtTime(vol, time);
+                g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+                o.connect(g); o.start(time); o.stop(time + 0.2);
+            } else if (type === 'snare') {
+                const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 200;
+                const n = ctx.createBufferSource();
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+                const d = buf.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                n.buffer = buf;
+                g.gain.setValueAtTime(vol * 0.8, time);
+                g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+                o.connect(g); n.connect(g); o.start(time); o.stop(time + 0.1); n.start(time);
+            } else if (type === 'hihat' || type === 'ohh') {
+                const n = ctx.createBufferSource();
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+                const d = buf.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                n.buffer = buf;
+                const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 8000;
+                g.gain.setValueAtTime(vol * 0.4, time);
+                g.gain.exponentialRampToValueAtTime(0.001, time + (type === 'ohh' ? 0.2 : 0.05));
+                n.connect(f); f.connect(g); n.start(time);
+            } else {
+                const o = ctx.createOscillator(); o.type = 'square';
+                o.frequency.value = 100 + Math.random() * 200;
+                g.gain.setValueAtTime(vol * 0.5, time);
+                g.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+                o.connect(g); o.start(time); o.stop(time + 0.1);
+            }
+        };
+        
+        const playSE = p => {
+            const ctx = getAudioContext(), time = ctx.currentTime, freq = 440 * p.pitch, dur = p.duration;
+            const mg = ctx.createGain();
+            mg.connect(ctx.destination);
+            mg.gain.setValueAtTime(0.5, time);
+            mg.gain.exponentialRampToValueAtTime(0.001, time + dur * p.decay);
+            if (p.type === 'tone' || p.noise < 1) {
+                const o = ctx.createOscillator(); o.type = p.wave || 'square';
+                if (p.curve === 'up') { o.frequency.setValueAtTime(freq * 0.5, time); o.frequency.exponentialRampToValueAtTime(freq * 2, time + dur); }
+                else if (p.curve === 'down') { o.frequency.setValueAtTime(freq * 2, time); o.frequency.exponentialRampToValueAtTime(freq * 0.3, time + dur); }
+                else o.frequency.setValueAtTime(freq, time);
+                const og = ctx.createGain(); og.gain.value = 1 - (p.noise || 0);
+                o.connect(og); og.connect(mg); o.start(time); o.stop(time + dur);
+            }
+            if (p.noise > 0) {
+                const nb = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+                const nd = nb.getChannelData(0);
+                for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+                const n = ctx.createBufferSource(); n.buffer = nb;
+                const ng = ctx.createGain(); ng.gain.value = p.noise * 0.5;
+                const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq * 2;
+                n.connect(f); f.connect(ng); ng.connect(mg); n.start(time);
+            }
+        };
+        
+        const BGM_PRESETS = {
+            battle: { bpm: 160, bars: 8, melodyTone: 'square', bassTone: 'triangle',
+                melody: {0:'E4',2:'E4',4:'E5',6:'E5',8:'G5',10:'G5',12:'E5',16:'D5',18:'D5',20:'E5',22:'E5',24:'D5',28:'C5'},
+                bass: {0:'E2',8:'G2',16:'D2',24:'C2'},
+                drum: {0:['kick','hihat'],2:['hihat'],4:['snare','hihat'],6:['hihat'],8:['kick','hihat'],10:['hihat'],12:['snare','hihat'],14:['hihat']}
+            },
+            field: { bpm: 100, bars: 8, melodyTone: 'triangle', bassTone: 'sine',
+                melody: {0:'C4',4:'E4',8:'G4',12:'E4',16:'F4',20:'A4',24:'G4'},
+                bass: {0:'C2',16:'F2'}, drum: {0:['kick'],8:['hihat'],16:['snare']}
+            },
+            dungeon: { bpm: 90, bars: 8, melodyTone: 'sawtooth', bassTone: 'triangle',
+                melody: {0:'E3',4:'G3',8:'A#3',12:'B3',16:'E3',20:'D3',24:'C3'},
+                bass: {0:'E2',8:'G2',16:'A#2',24:'B2'}, drum: {0:['kick'],12:['snare'],24:['hihat']}
+            },
+            boss: { bpm: 180, bars: 8, melodyTone: 'detune', bassTone: 'sawtooth',
+                melody: {0:'E4',2:'E4',4:'G4',6:'A4',8:'B4',10:'B4',12:'A4',14:'G4',16:'F#4',18:'F#4',20:'G4',22:'A4',24:'B4',28:'E5'},
+                bass: {0:'E2',4:'E2',8:'G2',12:'A2',16:'F#2',20:'F#2',24:'B2'},
+                drum: {0:['kick','hihat'],2:['hihat'],4:['kick','snare'],6:['hihat'],8:['kick','hihat'],10:['hihat'],12:['snare'],14:['hihat','kick']}
+            },
+            victory: { bpm: 140, bars: 4, melodyTone: 'bell', bassTone: 'triangle',
+                melody: {0:'C5',2:'E5',4:'G5',8:'C6',12:'G5',14:'C6'},
+                bass: {0:'C3',8:'G3'}, drum: {0:['kick','cymbal'],4:['snare'],8:['kick'],12:['snare','cymbal']}
+            },
+            shop: { bpm: 110, bars: 8, melodyTone: 'epiano', bassTone: 'sine',
+                melody: {0:'G4',4:'B4',8:'D5',12:'G5',16:'F#5',20:'D5',24:'B4'},
+                bass: {0:'G2',8:'D2',16:'B2',24:'G2'}, drum: {0:['kick'],8:['hihat'],16:['snare'],24:['hihat']}
+            },
+            title: { bpm: 120, bars: 8, melodyTone: 'strings', bassTone: 'sine',
+                melody: {0:'C4',8:'E4',16:'G4',24:'C5',28:'B4',30:'G4'},
+                bass: {0:'C2',16:'G2'}, drum: {}
+            },
+            gameover: { bpm: 70, bars: 4, melodyTone: 'sine', bassTone: 'triangle',
+                melody: {0:'E4',4:'D#4',8:'D4',12:'C#4',14:'C4'},
+                bass: {0:'E2',8:'D2'}, drum: {0:['kick'],12:['snare']}
+            }
+        };
+        
+        const DRUM_PATTERNS = {
+            rock: {0:['kick','hihat'],4:['snare','hihat'],8:['kick','hihat'],12:['snare','hihat']},
+            pop: {0:['kick','hihat'],2:['hihat'],4:['snare','hihat'],6:['hihat'],8:['kick','hihat'],10:['hihat'],12:['snare','hihat'],14:['hihat']},
+            disco: {0:['kick','hihat'],2:['hihat'],4:['kick','snare','hihat'],6:['hihat'],8:['kick','hihat'],10:['hihat'],12:['kick','snare','hihat'],14:['hihat']},
+            hiphop: {0:['kick'],4:['snare'],6:['kick'],8:['kick'],12:['snare'],14:['kick']},
+            techno: {0:['kick','hihat'],2:['hihat'],4:['kick','hihat'],6:['hihat'],8:['kick','hihat'],10:['hihat'],12:['kick','hihat'],14:['hihat']}
+        };
+        
+        const getAllNoteNames = () => {
+            const names = [];
+            OCTAVES.forEach(oct => [...NOTE_NAMES].reverse().forEach(note => names.push(note + oct)));
+            return names;
+        };
+        
+        const getMaxScrollX = () => Math.max(0, bgmState.bars * 4 * SUBDIVISIONS * CELL_WIDTH - (document.getElementById('pianoRollScroll').clientWidth - KEYS_WIDTH));
+        const getMaxScrollY = () => Math.max(0, getAllNoteNames().length * CELL_HEIGHT - document.getElementById('pianoRollScroll').clientHeight);
+        
+        const updateGridScroll = () => {
+            const gw = document.getElementById('gridWrapper');
+            const pk = document.querySelector('.piano-keys');
+            if (gw) gw.style.transform = `translateX(-${bgmState.scrollX}px)`;
+            if (pk && bgmState.currentTrack !== 'drum') pk.style.transform = `translateY(-${bgmState.scrollY}px)`;
+            if (gw && bgmState.currentTrack !== 'drum') {
+                const grid = gw.querySelector('.grid');
+                if (grid) grid.style.transform = `translateY(-${bgmState.scrollY}px)`;
+            }
+        };
+        
+        const buildGrid = () => {
+            const pr = document.getElementById('pianoRoll');
+            pr.innerHTML = '';
+            const totalSteps = bgmState.bars * 4 * SUBDIVISIONS;
+            
+            if (bgmState.currentTrack === 'drum') {
+                const grid = document.createElement('div');
+                grid.className = 'grid drum-grid grid-wrapper';
+                grid.id = 'gridWrapper';
+                DRUM_NAMES.forEach((drum, di) => {
+                    const row = document.createElement('div');
+                    row.className = 'grid-row';
+                    const label = document.createElement('div');
+                    label.className = 'drum-row-label';
+                    label.textContent = DRUM_LABELS[di];
+                    row.appendChild(label);
+                    for (let step = 0; step < totalSteps; step++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        if (step % SUBDIVISIONS === 0) cell.classList.add('beat-start');
+                        if (step % (SUBDIVISIONS * 4) === 0) cell.classList.add('bar-start');
+                        if (bgmState.drumNotes[step]?.includes(drum)) cell.classList.add('drum-active');
+                        cell.dataset.step = step; cell.dataset.drum = drum; cell.dataset.row = di;
+                        row.appendChild(cell);
+                    }
+                    grid.appendChild(row);
+                });
+                pr.appendChild(grid);
+            } else {
+                const keys = document.createElement('div');
+                keys.className = 'piano-keys';
+                const gw = document.createElement('div');
+                gw.className = 'grid-wrapper';
+                gw.id = 'gridWrapper';
+                const grid = document.createElement('div');
+                grid.className = 'grid';
+                const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes;
+                const allNotes = getAllNoteNames();
+                allNotes.forEach((noteName, rowIdx) => {
+                    const isBlack = noteName.includes('#');
+                    const isOctaveStart = noteName.startsWith('C') && !noteName.includes('#');
+                    const key = document.createElement('div');
+                    key.className = 'piano-key ' + (isBlack ? 'black' : 'white');
+                    if (isOctaveStart) key.classList.add('octave-start');
+                    key.textContent = noteName;
+                    key.addEventListener('click', () => previewNote(noteName));
+                    keys.appendChild(key);
+                    const row = document.createElement('div');
+                    row.className = 'grid-row';
+                    for (let step = 0; step < totalSteps; step++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        if (step % SUBDIVISIONS === 0) cell.classList.add('beat-start');
+                        if (step % (SUBDIVISIONS * 4) === 0) cell.classList.add('bar-start');
+                        if (notes[step] === noteName) cell.classList.add(bgmState.currentTrack === 'melody' ? 'active' : 'bass-active');
+                        cell.dataset.step = step; cell.dataset.note = noteName; cell.dataset.row = rowIdx;
+                        row.appendChild(cell);
+                    }
+                    grid.appendChild(row);
+                });
+                gw.appendChild(grid);
+                pr.appendChild(keys);
+                pr.appendChild(gw);
+            }
+            bgmState.scrollX = 0;
+            document.getElementById('scrollSliderX').value = 0;
+            document.getElementById('scrollSliderX').max = getMaxScrollX();
+            if (bgmState.currentTrack !== 'drum') {
+                document.getElementById('scrollSliderY').max = getMaxScrollY();
+                document.getElementById('scrollSliderY').value = bgmState.scrollY;
+            }
+            updateGridScroll();
+            setupGridEvents();
+            updateNoteCounts();
+        };
+        
+        const setupGridEvents = () => {
+            const gw = document.getElementById('gridWrapper');
+            if (!gw) return;
+            gw.addEventListener('mousedown', handleMouseDown);
+            gw.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            gw.addEventListener('touchstart', handleTouchStart, { passive: false });
+            gw.addEventListener('touchmove', handleTouchMove, { passive: false });
+            gw.addEventListener('touchend', handleMouseUp);
+        };
+        
+        const getCellInfo = c => ({ step: +c.dataset.step, note: c.dataset.note, drum: c.dataset.drum, row: +c.dataset.row });
+        
+        const handleMouseDown = e => {
+            e.preventDefault();
+            const c = e.target.classList.contains('grid-cell') ? e.target : null;
+            if (!c) return;
+            const info = getCellInfo(c);
+            if (bgmState.currentTool === 'select') {
+                bgmState.isSelecting = true;
+                const rect = document.getElementById('gridWrapper').getBoundingClientRect();
+                bgmState.selectStartX = e.clientX - rect.left + bgmState.scrollX;
+                bgmState.selectStartY = e.clientY - rect.top + bgmState.scrollY;
+                bgmState.selectCurrentX = bgmState.selectStartX;
+                bgmState.selectCurrentY = bgmState.selectStartY;
+                clearSelection();
+                updateSelectionRect();
+            } else {
+                bgmState.isDragging = true;
+                bgmState.lastDraggedCell = null;
+                processCell(c, info);
+            }
+        };
+        
+        const handleMouseMove = e => {
+            if (bgmState.isSelecting) {
+                const rect = document.getElementById('gridWrapper').getBoundingClientRect();
+                bgmState.selectCurrentX = e.clientX - rect.left + bgmState.scrollX;
+                bgmState.selectCurrentY = e.clientY - rect.top + bgmState.scrollY;
+                updateSelectionRect();
+                highlightCellsInSelection();
+            } else if (bgmState.isDragging) {
+                const c = e.target.classList.contains('grid-cell') ? e.target : null;
+                if (c) {
+                    const info = getCellInfo(c);
+                    const key = `${info.step}-${info.row}`;
+                    if (bgmState.lastDraggedCell !== key) {
+                        processCell(c, info);
+                        bgmState.lastDraggedCell = key;
+                    }
+                }
+            }
+        };
+        
+        const handleMouseUp = () => {
+            if (bgmState.isSelecting) { finalizeSelection(); removeSelectionRect(); }
+            bgmState.isDragging = false;
+            bgmState.isSelecting = false;
+            bgmState.lastDraggedCell = null;
+        };
+        
+        const handleTouchStart = e => {
+            e.preventDefault();
+            const t = e.touches[0];
+            const c = document.elementFromPoint(t.clientX, t.clientY);
+            if (c?.classList.contains('grid-cell')) {
+                const info = getCellInfo(c);
+                if (bgmState.currentTool === 'select') {
+                    bgmState.isSelecting = true;
+                    const rect = document.getElementById('gridWrapper').getBoundingClientRect();
+                    bgmState.selectStartX = t.clientX - rect.left + bgmState.scrollX;
+                    bgmState.selectStartY = t.clientY - rect.top + bgmState.scrollY;
+                    bgmState.selectCurrentX = bgmState.selectStartX;
+                    bgmState.selectCurrentY = bgmState.selectStartY;
+                    clearSelection();
+                    updateSelectionRect();
+                } else {
+                    bgmState.isDragging = true;
+                    bgmState.lastDraggedCell = null;
+                    processCell(c, info);
+                }
+            }
+        };
+        
+        const handleTouchMove = e => {
+            e.preventDefault();
+            const t = e.touches[0];
+            if (bgmState.isSelecting) {
+                const rect = document.getElementById('gridWrapper').getBoundingClientRect();
+                bgmState.selectCurrentX = t.clientX - rect.left + bgmState.scrollX;
+                bgmState.selectCurrentY = t.clientY - rect.top + bgmState.scrollY;
+                updateSelectionRect();
+                highlightCellsInSelection();
+            } else if (bgmState.isDragging) {
+                const c = document.elementFromPoint(t.clientX, t.clientY);
+                if (c?.classList.contains('grid-cell')) {
+                    const info = getCellInfo(c);
+                    const key = `${info.step}-${info.row}`;
+                    if (bgmState.lastDraggedCell !== key) {
+                        processCell(c, info);
+                        bgmState.lastDraggedCell = key;
+                    }
+                }
+            }
+        };
+        
+        const processCell = (c, info) => {
+            bgmState.currentTrack === 'drum' ? toggleDrum(info.step, info.drum, c) : toggleNote(info.step, info.note, c);
+        };
+        
+        const toggleNote = (step, note, cell) => {
+            saveHistory();
+            const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes;
+            const cls = bgmState.currentTrack === 'melody' ? 'active' : 'bass-active';
+            if (bgmState.currentTool === 'eraser') {
+                if (notes[step] === note) { delete notes[step]; cell.classList.remove(cls); }
+            } else {
+                document.querySelectorAll(`.grid-cell[data-step="${step}"]`).forEach(c => c.classList.remove(cls));
+                notes[step] = note;
+                cell.classList.add(cls);
+                previewNote(note);
+            }
+            updateNoteCounts();
+        };
+        
+        const toggleDrum = (step, drum, cell) => {
+            saveHistory();
+            if (!bgmState.drumNotes[step]) bgmState.drumNotes[step] = [];
+            if (bgmState.currentTool === 'eraser') {
+                const idx = bgmState.drumNotes[step].indexOf(drum);
+                if (idx >= 0) { bgmState.drumNotes[step].splice(idx, 1); if (!bgmState.drumNotes[step].length) delete bgmState.drumNotes[step]; cell.classList.remove('drum-active'); }
+            } else {
+                if (!bgmState.drumNotes[step].includes(drum)) { bgmState.drumNotes[step].push(drum); cell.classList.add('drum-active'); playDrum(drum, getAudioContext().currentTime, bgmState.volumes.drum); }
+            }
+            updateNoteCounts();
+        };
+        
+        const updateSelectionRect = () => {
+            let r = document.getElementById('selectionRect');
+            if (!r) { r = document.createElement('div'); r.id = 'selectionRect'; r.className = 'selection-rect'; document.getElementById('gridWrapper').appendChild(r); }
+            const x1 = Math.min(bgmState.selectStartX, bgmState.selectCurrentX) - bgmState.scrollX;
+            const y1 = Math.min(bgmState.selectStartY, bgmState.selectCurrentY) - bgmState.scrollY;
+            const x2 = Math.max(bgmState.selectStartX, bgmState.selectCurrentX) - bgmState.scrollX;
+            const y2 = Math.max(bgmState.selectStartY, bgmState.selectCurrentY) - bgmState.scrollY;
+            const ox = bgmState.currentTrack === 'drum' ? 45 : 0;
+            r.style.left = (x1 + ox) + 'px'; r.style.top = y1 + 'px';
+            r.style.width = (x2 - x1) + 'px'; r.style.height = (y2 - y1) + 'px';
+        };
+        
+        const removeSelectionRect = () => document.getElementById('selectionRect')?.remove();
+        
+        const highlightCellsInSelection = () => {
+            const ch = bgmState.currentTrack === 'drum' ? DRUM_CELL_HEIGHT : CELL_HEIGHT;
+            const x1 = Math.min(bgmState.selectStartX, bgmState.selectCurrentX);
+            const y1 = Math.min(bgmState.selectStartY, bgmState.selectCurrentY);
+            const x2 = Math.max(bgmState.selectStartX, bgmState.selectCurrentX);
+            const y2 = Math.max(bgmState.selectStartY, bgmState.selectCurrentY);
+            document.querySelectorAll('.grid-cell').forEach(c => {
+                c.classList.remove('in-selection');
+                const cx = +c.dataset.step * CELL_WIDTH, cy = +c.dataset.row * ch;
+                if (cx + CELL_WIDTH > x1 && cx < x2 && cy + ch > y1 && cy < y2) c.classList.add('in-selection');
+            });
+        };
+        
+        const finalizeSelection = () => {
+            const ch = bgmState.currentTrack === 'drum' ? DRUM_CELL_HEIGHT : CELL_HEIGHT;
+            const x1 = Math.min(bgmState.selectStartX, bgmState.selectCurrentX);
+            const y1 = Math.min(bgmState.selectStartY, bgmState.selectCurrentY);
+            const x2 = Math.max(bgmState.selectStartX, bgmState.selectCurrentX);
+            const y2 = Math.max(bgmState.selectStartY, bgmState.selectCurrentY);
+            document.querySelectorAll('.grid-cell').forEach(c => {
+                c.classList.remove('in-selection');
+                const step = +c.dataset.step, row = +c.dataset.row, nd = c.dataset.note || c.dataset.drum;
+                const cx = step * CELL_WIDTH, cy = row * ch;
+                if (cx + CELL_WIDTH > x1 && cx < x2 && cy + ch > y1 && cy < y2) {
+                    let has = false;
+                    if (bgmState.currentTrack === 'drum') has = bgmState.drumNotes[step]?.includes(nd);
+                    else has = (bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes)[step] === nd;
+                    if (has) { bgmState.selection.add(`${step}:${nd}`); c.classList.add('selected'); }
+                }
+            });
+            updateSelectionInfo();
+        };
+        
+        const clearSelection = () => { bgmState.selection.clear(); document.querySelectorAll('.grid-cell.selected').forEach(c => c.classList.remove('selected')); updateSelectionInfo(); };
+        const updateSelectionInfo = () => document.getElementById('selectionInfo').textContent = bgmState.selection.size ? `選択中: ${bgmState.selection.size}個` : '';
+        const previewNote = n => createOscillator(noteToFreq(n), bgmState.currentTrack === 'melody' ? bgmState.melodyTone : bgmState.bassTone, getAudioContext().currentTime, 0.2, 0.5);
+        const updateNoteCounts = () => {
+            document.getElementById('melodyCount').textContent = `(${Object.keys(bgmState.melodyNotes).length})`;
+            document.getElementById('bassCount').textContent = `(${Object.keys(bgmState.bassNotes).length})`;
+            let dc = 0; Object.values(bgmState.drumNotes).forEach(a => dc += a.length);
+            document.getElementById('drumCount').textContent = `(${dc})`;
+        };
+        
+        const startPlayback = () => {
+            if (bgmState.isPlaying) return;
+            const ctx = getAudioContext();
+            bgmState.isPlaying = true; currentStep = 0;
+            const total = bgmState.bars * 4 * SUBDIVISIONS, dur = 60 / bgmState.bpm / SUBDIVISIONS;
+            playInterval = setInterval(() => {
+                const t = ctx.currentTime;
+                if (!bgmState.muted.melody && bgmState.melodyNotes[currentStep]) createOscillator(noteToFreq(bgmState.melodyNotes[currentStep]), bgmState.melodyTone, t, dur * 1.5, bgmState.volumes.melody);
+                if (!bgmState.muted.bass && bgmState.bassNotes[currentStep]) createOscillator(noteToFreq(bgmState.bassNotes[currentStep]), bgmState.bassTone, t, dur * 2, bgmState.volumes.bass);
+                if (!bgmState.muted.drum && bgmState.drumNotes[currentStep]) bgmState.drumNotes[currentStep].forEach(d => playDrum(d, t, bgmState.volumes.drum));
+                currentStep++;
+                if (currentStep >= total) currentStep = bgmState.loop ? 0 : (stopPlayback(), 0);
+            }, dur * 1000);
+        };
+        
+        const stopPlayback = () => { bgmState.isPlaying = false; if (playInterval) { clearInterval(playInterval); playInterval = null; } };
+        
+        const loadPreset = name => {
+            if (!BGM_PRESETS[name]) return;
+            stopPlayback();
+            const p = BGM_PRESETS[name];
+            Object.assign(bgmState, { bpm: p.bpm, bars: p.bars, melodyTone: p.melodyTone, bassTone: p.bassTone,
+                melodyNotes: JSON.parse(JSON.stringify(p.melody || {})),
+                bassNotes: JSON.parse(JSON.stringify(p.bass || {})),
+                drumNotes: JSON.parse(JSON.stringify(p.drum || {}))
+            });
+            document.getElementById('bpm').value = bgmState.bpm;
+            document.getElementById('bars').value = bgmState.bars;
+            document.getElementById('melodyTone').value = bgmState.melodyTone;
+            document.getElementById('bassTone').value = bgmState.bassTone;
+            clearSelection(); buildGrid();
+        };
+        
+        const applyDrumPattern = name => {
+            if (!DRUM_PATTERNS[name]) return;
+            saveHistory();
+            const pat = DRUM_PATTERNS[name], total = bgmState.bars * 4 * SUBDIVISIONS;
+            bgmState.drumNotes = {};
+            for (let s = 0; s < total; s++) { const ps = s % 16; if (pat[ps]) bgmState.drumNotes[s] = [...pat[ps]]; }
+            buildGrid();
+        };
+        
+        const saveHistory = () => {
+            const snap = { melodyNotes: JSON.parse(JSON.stringify(bgmState.melodyNotes)), bassNotes: JSON.parse(JSON.stringify(bgmState.bassNotes)), drumNotes: JSON.parse(JSON.stringify(bgmState.drumNotes)) };
+            bgmState.history = bgmState.history.slice(0, bgmState.historyIndex + 1);
+            bgmState.history.push(snap);
+            if (bgmState.history.length > 50) bgmState.history.shift();
+            bgmState.historyIndex = bgmState.history.length - 1;
+        };
+        
+        const undo = () => { if (bgmState.historyIndex <= 0) return; bgmState.historyIndex--; const s = bgmState.history[bgmState.historyIndex]; bgmState.melodyNotes = JSON.parse(JSON.stringify(s.melodyNotes)); bgmState.bassNotes = JSON.parse(JSON.stringify(s.bassNotes)); bgmState.drumNotes = JSON.parse(JSON.stringify(s.drumNotes)); clearSelection(); buildGrid(); };
+        const redo = () => { if (bgmState.historyIndex >= bgmState.history.length - 1) return; bgmState.historyIndex++; const s = bgmState.history[bgmState.historyIndex]; bgmState.melodyNotes = JSON.parse(JSON.stringify(s.melodyNotes)); bgmState.bassNotes = JSON.parse(JSON.stringify(s.bassNotes)); bgmState.drumNotes = JSON.parse(JSON.stringify(s.drumNotes)); clearSelection(); buildGrid(); };
+        
+        const copySelection = () => { if (!bgmState.selection.size) return; bgmState.clipboard = []; bgmState.clipboardTrack = bgmState.currentTrack; let min = Infinity; bgmState.selection.forEach(k => { const s = +k.split(':')[0]; if (s < min) min = s; }); bgmState.selection.forEach(k => { const [s, nd] = k.split(':'); bgmState.clipboard.push({ relativeStep: +s - min, noteOrDrum: nd }); }); showToast('コピーしました', 'success'); };
+        const pasteSelection = () => { if (!bgmState.clipboard?.length) return; if (bgmState.clipboardTrack !== bgmState.currentTrack) { showToast('同じトラックにのみペースト可'); return; } saveHistory(); let ps = 0; if (bgmState.selection.size) { let min = Infinity; bgmState.selection.forEach(k => { const s = +k.split(':')[0]; if (s < min) min = s; }); ps = min; } const total = bgmState.bars * 4 * SUBDIVISIONS; bgmState.clipboard.forEach(i => { const ts = ps + i.relativeStep; if (ts >= total) return; if (bgmState.currentTrack === 'drum') { if (!bgmState.drumNotes[ts]) bgmState.drumNotes[ts] = []; if (!bgmState.drumNotes[ts].includes(i.noteOrDrum)) bgmState.drumNotes[ts].push(i.noteOrDrum); } else { (bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes)[ts] = i.noteOrDrum; } }); buildGrid(); };
+        const deleteSelection = () => { if (!bgmState.selection.size) return; saveHistory(); bgmState.selection.forEach(k => { const [s, nd] = k.split(':'); const step = +s; if (bgmState.currentTrack === 'drum') { if (bgmState.drumNotes[step]) { const idx = bgmState.drumNotes[step].indexOf(nd); if (idx >= 0) bgmState.drumNotes[step].splice(idx, 1); if (!bgmState.drumNotes[step].length) delete bgmState.drumNotes[step]; } } else { const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; if (notes[step] === nd) delete notes[step]; } }); clearSelection(); buildGrid(); };
+        const transpose = sem => { saveHistory(); const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; const steps = bgmState.selection.size ? [...bgmState.selection].map(k => +k.split(':')[0]) : Object.keys(notes).map(Number); steps.forEach(step => { if (!notes[step]) return; const m = notes[step].match(/^([A-G]#?)(\d)$/); if (!m) return; let ni = NOTE_NAMES.indexOf(m[1]), oct = +m[2]; ni += sem; while (ni < 0) { ni += 12; oct--; } while (ni >= 12) { ni -= 12; oct++; } if (oct >= 2 && oct <= 6) notes[step] = NOTE_NAMES[ni] + oct; }); clearSelection(); buildGrid(); };
+        const reverseTrack = () => { saveHistory(); const notes = bgmState.currentTrack === 'drum' ? bgmState.drumNotes : bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; const total = bgmState.bars * 4 * SUBDIVISIONS, rev = {}; Object.keys(notes).forEach(s => rev[total - 1 - +s] = notes[s]); if (bgmState.currentTrack === 'melody') bgmState.melodyNotes = rev; else if (bgmState.currentTrack === 'bass') bgmState.bassNotes = rev; else bgmState.drumNotes = rev; clearSelection(); buildGrid(); };
+        const randomize = () => { saveHistory(); const total = bgmState.bars * 4 * SUBDIVISIONS; if (bgmState.currentTrack === 'drum') { bgmState.drumNotes = {}; for (let s = 0; s < total; s++) { if (Math.random() < 0.25) { bgmState.drumNotes[s] = []; if (s % 8 === 0) bgmState.drumNotes[s].push('kick'); if (s % 8 === 4) bgmState.drumNotes[s].push('snare'); if (Math.random() < 0.5) bgmState.drumNotes[s].push('hihat'); } } } else { const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; const scale = ['C','D','E','G','A'], oct = bgmState.currentTrack === 'melody' ? 4 : 2; Object.keys(notes).forEach(k => delete notes[k]); for (let s = 0; s < total; s++) { if (Math.random() < 0.2) notes[s] = scale[Math.floor(Math.random() * scale.length)] + oct; } } clearSelection(); buildGrid(); };
+        
+        const encodeNote = n => { const m = n.match(/^([A-G])(#?)(\d)$/); return m ? (m[2] === '#' ? m[1].toLowerCase() : m[1]) + m[3] : n; };
+        
+        const generateBGMExportData = () => {
+            const mel = Object.entries(bgmState.melodyNotes).sort((a,b) => +a[0] - +b[0]).map(([p,n]) => `${p}:${encodeNote(n)}`).join(',');
+            const bas = Object.entries(bgmState.bassNotes).sort((a,b) => +a[0] - +b[0]).map(([p,n]) => `${p}:${encodeNote(n)}`).join(',');
+            const drm = Object.entries(bgmState.drumNotes).sort((a,b) => +a[0] - +b[0]).map(([p,d]) => `${p}:${d.map(x => DRUM_ENCODE[x] || x[0].toUpperCase()).join('')}`).join(',');
+            const fx = [];
+            if (bgmState.effects.reverb > 0.1) fx.push(`reverb:${Math.round(bgmState.effects.reverb * 100)}`);
+            if (bgmState.effects.delay > 0) fx.push(`delay:${Math.round(bgmState.effects.delay * 100)}`);
+            if (bgmState.effects.vibrato > 0) fx.push(`vibrato:${Math.round(bgmState.effects.vibrato * 100)}`);
+            if (bgmState.effects.swing > 0) fx.push(`swing:${Math.round(bgmState.effects.swing * 100)}`);
+            
+            const header = `【BGMデータ】
+BPM:${bgmState.bpm}|小節:${bgmState.bars}|拍子:4/4|分解能:16分
+メロディ音色:${bgmState.melodyTone}|ベース音色:${bgmState.bassTone}
+${fx.length ? 'エフェクト:' + fx.join(',') : ''}
+音階表記: 大文字=通常,小文字=#(例:c4=C#4)
+ドラム: K=kick,S=snare,H=hihat,O=ohh,T=tomH,L=tomL,C=clap,R=rim,Y=cymbal,B=cowbell
+
+【依頼】
+このBGMデータをWeb Audio APIで再生可能なJavaScriptクラス「BGMPlayer」として実装してください。
+・BGMPlayerクラスを作成し、play(), stop(), setVolume(v) メソッドを実装
+・ゲーム内BGMとして使用するため、ループ再生対応
+・変数名: bgm (例: const bgm = new BGMPlayer(); bgm.play();)
+
+[MELODY]
+${mel || '(なし)'}
+[BASS]
+${bas || '(なし)'}
+[DRUM]
+${drm || '(なし)'}`;
+            
+            return splitIntoChunks(header);
+        };
+        
+        const splitIntoChunks = data => {
+            if (data.length <= MAX_CHARS) return [data];
+            const chunks = [], sections = [];
+            const he = data.indexOf('[MELODY]');
+            if (he > 0) sections.push(data.substring(0, he));
+            const ms = data.indexOf('[MELODY]'), bs = data.indexOf('[BASS]'), ds = data.indexOf('[DRUM]');
+            if (ms >= 0 && bs > ms) sections.push(data.substring(ms, bs));
+            if (bs >= 0 && ds > bs) sections.push(data.substring(bs, ds));
+            if (ds >= 0) sections.push(data.substring(ds));
+            let cur = '';
+            const contents = [];
+            sections.forEach(sec => {
+                const max = MAX_CHARS - 50;
+                if (cur.length + sec.length <= max) cur += sec;
+                else {
+                    if (cur.length) contents.push(cur);
+                    if (sec.length > max) {
+                        let rem = sec;
+                        while (rem.length) {
+                            if (rem.length <= max) { contents.push(rem); rem = ''; }
+                            else { let cut = max; while (cut > 0 && rem[cut] !== ',') cut--; if (!cut) cut = max; contents.push(rem.substring(0, cut + 1)); rem = rem.substring(cut + 1); }
+                        }
+                        cur = '';
+                    } else cur = sec;
+                }
+            });
+            if (cur.length) contents.push(cur);
+            const total = contents.length;
+            contents.forEach((c, i) => {
+                const prefix = total > 1 && i === 0 
+                    ? `【${i + 1}回目/${total}回】\n※このBGMデータは${total}回に分けて送信します。全て届くまでお待ちください。\n\n`
+                    : total > 1 
+                    ? `【${i + 1}回目/${total}回】\n` 
+                    : '';
+                chunks.push(prefix + c);
+            });
+            return chunks;
+        };
+        
+        const showBGMExportData = () => {
+            bgmState.chunks = generateBGMExportData();
+            bgmState.currentChunk = 0;
+            displayBGMCurrentChunk();
+            document.getElementById('chunkNav').style.display = bgmState.chunks.length > 1 ? 'flex' : 'none';
+        };
+        
+        const displayBGMCurrentChunk = () => {
+            const d = bgmState.chunks[bgmState.currentChunk];
+            document.getElementById('exportOutput').textContent = d;
+            document.getElementById('charCount').textContent = `文字数: ${d.length} / ${MAX_CHARS}${bgmState.chunks.length > 1 ? ` (全${bgmState.chunks.length}回送信)` : ''}`;
+            document.getElementById('chunkInfo').textContent = `${bgmState.currentChunk + 1}/${bgmState.chunks.length}`;
+        };
+        
+        const copyBGMCurrentChunk = () => {
+            navigator.clipboard.writeText(bgmState.chunks[bgmState.currentChunk] || document.getElementById('exportOutput').textContent).then(() => {
+                showToast(`コピーしました！${bgmState.chunks.length > 1 ? `(${bgmState.currentChunk + 1}/${bgmState.chunks.length}回目)` : ''}`, 'success');
+            });
+        };
+        
+        const addSE = (preset = null) => {
+            seIdCounter++;
+            const id = `se${seIdCounter}`;
+            const p = preset && SE_PRESETS[preset] ? { ...SE_PRESETS[preset], usage: preset } : { type: 'tone', wave: 'square', pitch: 1.0, duration: 0.2, curve: 'none', decay: 0.7, noise: 0, usage: '' };
+            seState.items.push({ id, ...p });
+            renderSEList();
+        };
+        
+        const removeSE = id => { seState.items = seState.items.filter(i => i.id !== id); renderSEList(); };
+        const updateSEParam = (id, param, val) => { const i = seState.items.find(x => x.id === id); if (i) i[param] = val; };
+        
+        const renderSEList = () => {
+            const con = document.getElementById('seListContainer');
+            con.innerHTML = '';
+            seState.items.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'se-item';
+                div.id = `se-item-${item.id}`;
+                div.innerHTML = `
+                    <div class="se-item-header"><span class="se-item-name">${item.id}</span><div class="se-item-controls"><button class="se-preview-btn" onclick="playSE(seState.items[${idx}])">▶ 再生</button><button class="delete-btn" onclick="removeSE('${item.id}')">🗑️</button></div></div>
+                    <div class="se-item-body">
+                        <div class="se-param-row"><div class="se-param"><label>タイプ:</label><select onchange="updateSEParam('${item.id}','type',this.value)"><option value="tone" ${item.type === 'tone' ? 'selected' : ''}>トーン</option><option value="noise" ${item.type === 'noise' ? 'selected' : ''}>ノイズ</option></select></div><div class="se-param"><label>波形:</label><select onchange="updateSEParam('${item.id}','wave',this.value)"><option value="square" ${item.wave === 'square' ? 'selected' : ''}>矩形波</option><option value="sine" ${item.wave === 'sine' ? 'selected' : ''}>サイン波</option><option value="triangle" ${item.wave === 'triangle' ? 'selected' : ''}>三角波</option><option value="sawtooth" ${item.wave === 'sawtooth' ? 'selected' : ''}>ノコギリ波</option></select></div></div>
+                        <div class="se-param-row"><div class="se-param"><label>音程:</label><input type="range" min="0.1" max="3" step="0.1" value="${item.pitch}" onchange="updateSEParam('${item.id}','pitch',parseFloat(this.value));this.nextElementSibling.textContent=this.value"><span class="param-value">${item.pitch}</span></div><div class="se-param"><label>長さ:</label><input type="range" min="0.05" max="1" step="0.05" value="${item.duration}" onchange="updateSEParam('${item.id}','duration',parseFloat(this.value));this.nextElementSibling.textContent=this.value"><span class="param-value">${item.duration}</span></div></div>
+                        <div class="se-param-row"><div class="se-param"><label>カーブ:</label><select onchange="updateSEParam('${item.id}','curve',this.value)"><option value="none" ${item.curve === 'none' ? 'selected' : ''}>なし</option><option value="up" ${item.curve === 'up' ? 'selected' : ''}>上昇</option><option value="down" ${item.curve === 'down' ? 'selected' : ''}>下降</option></select></div><div class="se-param"><label>減衰:</label><input type="range" min="0.1" max="1" step="0.1" value="${item.decay}" onchange="updateSEParam('${item.id}','decay',parseFloat(this.value));this.nextElementSibling.textContent=this.value"><span class="param-value">${item.decay}</span></div></div>
+                        <div class="se-param-row"><div class="se-param"><label>ノイズ:</label><input type="range" min="0" max="1" step="0.1" value="${item.noise}" onchange="updateSEParam('${item.id}','noise',parseFloat(this.value));this.nextElementSibling.textContent=this.value"><span class="param-value">${item.noise}</span></div></div>
+                        <div class="se-usage"><label>用途:</label><input type="text" id="usage-${item.id}" value="${item.usage}" placeholder="例: ジャンプ、攻撃など（必須）" onchange="updateSEParam('${item.id}','usage',this.value)"></div>
+                    </div>`;
+                con.appendChild(div);
+            });
+            document.getElementById('seCount').textContent = `(${seState.items.length}個)`;
+        };
+        
+        const validateSEUsage = () => {
+            let valid = true;
+            const missing = [];
+            seState.items.forEach(i => {
+                const inp = document.getElementById(`usage-${i.id}`);
+                const itm = document.getElementById(`se-item-${i.id}`);
+                if (!i.usage?.trim()) { valid = false; missing.push(i.id); inp?.classList.add('error'); itm?.classList.add('error'); }
+                else { inp?.classList.remove('error'); itm?.classList.remove('error'); }
+            });
+            return { valid, missing };
+        };
+        
+        const generateSEExportData = () => {
+            if (!seState.items.length) return '【SEデータ】\n(なし)';
+            const lines = seState.items.map(i => `${i.id}:{t:${i.type},w:${i.wave},p:${i.pitch},d:${i.duration},c:${i.curve},dc:${i.decay},n:${i.noise}} // ${i.usage}`);
+            return `【SEデータ】\n${lines.join('\n')}\n\n【依頼】\nこのSEデータをWeb Audio APIで再生可能なJavaScriptクラス「SEPlayer」として実装してください。\n・SEPlayerクラスを作成し、play(id) メソッドで各SEを再生\n・パラメータ: t=タイプ, w=波形, p=音程, d=長さ, c=カーブ(up/down/none), dc=減衰, n=ノイズ量\n・各SEの用途: ${seState.items.map(i => `${i.id}=${i.usage}`).join(', ')}\n・使用例: const se = new SEPlayer(); se.play('se1');`;
+        };
+        
+        const showSEExportData = () => {
+            if (!seState.items.length) { showToast('SEが1つも作成されていません'); return; }
+            const v = validateSEUsage();
+            if (!v.valid) { showToast(`用途が未入力のSEがあります: ${v.missing.join(', ')}`); return; }
+            const out = generateSEExportData();
+            document.getElementById('seExportOutput').textContent = out;
+            document.getElementById('seCharCount').textContent = `文字数: ${out.length} / ${MAX_CHARS}`;
+        };
+        
+        const copySEData = () => {
+            const t = document.getElementById('seExportOutput').textContent;
+            if (!t || t === 'ここに生成データが表示されます') { showToast('先にデータを生成してください'); return; }
+            navigator.clipboard.writeText(t).then(() => showToast('コピーしました！', 'success'));
+        };
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            saveHistory(); buildGrid(); renderSEList();
+            
+            document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('click', () => {
+                document.querySelectorAll('.main-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+            }));
+            
+            document.getElementById('scrollSliderX').addEventListener('input', e => { bgmState.scrollX = +e.target.value; updateGridScroll(); });
+            document.getElementById('scrollSliderY').addEventListener('input', e => { bgmState.scrollY = +e.target.value; updateGridScroll(); });
+            
+            document.getElementById('bpm').addEventListener('change', e => bgmState.bpm = +e.target.value || 120);
+            document.getElementById('bars').addEventListener('change', e => { bgmState.bars = +e.target.value; clearSelection(); buildGrid(); });
+            document.getElementById('preset').addEventListener('change', e => { if (e.target.value) loadPreset(e.target.value); });
+            document.getElementById('playBtn').addEventListener('click', startPlayback);
+            document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+            document.getElementById('loopChk').addEventListener('change', e => bgmState.loop = e.target.checked);
+            
+            document.getElementById('reverb').addEventListener('input', e => bgmState.effects.reverb = e.target.value / 100);
+            document.getElementById('delay').addEventListener('input', e => bgmState.effects.delay = e.target.value / 100);
+            document.getElementById('vibrato').addEventListener('input', e => bgmState.effects.vibrato = e.target.value / 100);
+            document.getElementById('swing').addEventListener('input', e => bgmState.effects.swing = e.target.value / 100);
+            
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => btn.addEventListener('click', () => {
+                document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                bgmState.currentTool = btn.dataset.tool;
+                if (bgmState.currentTool !== 'select') clearSelection();
+            }));
+            
+            document.getElementById('undoBtn').addEventListener('click', undo);
+            document.getElementById('redoBtn').addEventListener('click', redo);
+            document.getElementById('copyBtn').addEventListener('click', copySelection);
+            document.getElementById('pasteBtn').addEventListener('click', pasteSelection);
+            document.getElementById('deleteBtn').addEventListener('click', deleteSelection);
+            document.getElementById('transposeUp').addEventListener('click', () => transpose(1));
+            document.getElementById('transposeDown').addEventListener('click', () => transpose(-1));
+            document.getElementById('reverseBtn').addEventListener('click', reverseTrack);
+            document.getElementById('randomBtn').addEventListener('click', randomize);
+            
+            document.querySelectorAll('.track-tab').forEach(tab => tab.addEventListener('click', () => {
+                document.querySelectorAll('.track-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                bgmState.currentTrack = tab.dataset.track;
+                document.getElementById('toneSelect').style.display = bgmState.currentTrack === 'drum' ? 'none' : 'block';
+                document.getElementById('bassToneGroup').style.display = bgmState.currentTrack === 'bass' ? 'flex' : 'none';
+                document.getElementById('drumPatterns').style.display = bgmState.currentTrack === 'drum' ? 'block' : 'none';
+                clearSelection(); buildGrid();
+            }));
+            
+            document.getElementById('melodyTone').addEventListener('change', e => bgmState.melodyTone = e.target.value);
+            document.getElementById('bassTone').addEventListener('change', e => bgmState.bassTone = e.target.value);
+            document.getElementById('applyDrumPattern').addEventListener('click', () => { const p = document.getElementById('drumPattern').value; if (p) applyDrumPattern(p); });
+            
+            document.getElementById('melodyVol').addEventListener('input', e => bgmState.volumes.melody = e.target.value / 100);
+            document.getElementById('bassVol').addEventListener('input', e => bgmState.volumes.bass = e.target.value / 100);
+            document.getElementById('drumVol').addEventListener('input', e => bgmState.volumes.drum = e.target.value / 100);
+            
+            document.querySelectorAll('.mute-btn').forEach(btn => btn.addEventListener('click', () => {
+                const t = btn.dataset.track;
+                bgmState.muted[t] = !bgmState.muted[t];
+                btn.classList.toggle('muted', bgmState.muted[t]);
+            }));
+            
+            document.getElementById('generateBtn').addEventListener('click', showBGMExportData);
+            document.getElementById('copyDataBtn').addEventListener('click', copyBGMCurrentChunk);
+            document.getElementById('prevChunk').addEventListener('click', () => { if (bgmState.currentChunk > 0) { bgmState.currentChunk--; displayBGMCurrentChunk(); } });
+            document.getElementById('nextChunk').addEventListener('click', () => { if (bgmState.currentChunk < bgmState.chunks.length - 1) { bgmState.currentChunk++; displayBGMCurrentChunk(); } });
+            
+            document.getElementById('addSeBtn').addEventListener('click', () => addSE());
+            document.getElementById('generateSeBtn').addEventListener('click', showSEExportData);
+            document.getElementById('copySeDataBtn').addEventListener('click', copySEData);
+            
+            document.querySelectorAll('.se-preset-btn').forEach(btn => btn.addEventListener('click', () => addSE(btn.dataset.preset)));
+        });
+    </script>
+</body>
+</html>
