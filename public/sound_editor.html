@@ -213,6 +213,7 @@
         .grid-cell.bar-start { border-left: 2px solid #0ff; }
         .grid-cell.selected { outline: 2px solid #ff0; outline-offset: -2px; }
         .grid-cell.in-selection { background: rgba(255,255,0,0.3) !important; }
+        .grid-cell.paste-target { outline: 2px dashed #0f0; outline-offset: -2px; }
         
         .drum-row-label {
             width: 45px; height: 22px; display: flex;
@@ -566,7 +567,7 @@
 
     <script>
         const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-        const OCTAVES = [6, 5, 4, 3, 2]; // 5オクターブに拡張
+        const OCTAVES = [6, 5, 4, 3, 2];
         const SUBDIVISIONS = 4;
         const DRUM_NAMES = ['kick', 'snare', 'hihat', 'ohh', 'tomH', 'tomL', 'clap', 'rim', 'cymbal', 'cowbell'];
         const DRUM_LABELS = ['K kick', 'S snare', 'H hihat', 'O ohh', 'T tomH', 'L tomL', 'C clap', 'R rim', 'Y cymbal', 'B cowbell'];
@@ -596,7 +597,8 @@
             history: [], historyIndex: -1, chunks: [], currentChunk: 0,
             isDragging: false, isSelecting: false,
             selectStartX: 0, selectStartY: 0, selectCurrentX: 0, selectCurrentY: 0,
-            scrollX: 0, scrollY: 0
+            scrollX: 0, scrollY: 0,
+            pasteTargetStep: 0, pasteTargetRow: 0
         };
         
         let playInterval = null, currentStep = 0;
@@ -869,6 +871,12 @@
             const c = e.target.classList.contains('grid-cell') ? e.target : null;
             if (!c) return;
             const info = getCellInfo(c);
+            
+            // 常にクリック位置を記録（ペースト先として使用）
+            bgmState.pasteTargetStep = info.step;
+            bgmState.pasteTargetRow = info.row;
+            updatePasteTargetHighlight();
+            
             if (bgmState.currentTool === 'select') {
                 bgmState.isSelecting = true;
                 const rect = document.getElementById('gridWrapper').getBoundingClientRect();
@@ -918,6 +926,12 @@
             const c = document.elementFromPoint(t.clientX, t.clientY);
             if (c?.classList.contains('grid-cell')) {
                 const info = getCellInfo(c);
+                
+                // 常にタップ位置を記録
+                bgmState.pasteTargetStep = info.step;
+                bgmState.pasteTargetRow = info.row;
+                updatePasteTargetHighlight();
+                
                 if (bgmState.currentTool === 'select') {
                     bgmState.isSelecting = true;
                     const rect = document.getElementById('gridWrapper').getBoundingClientRect();
@@ -955,6 +969,12 @@
                     }
                 }
             }
+        };
+        
+        const updatePasteTargetHighlight = () => {
+            document.querySelectorAll('.grid-cell.paste-target').forEach(c => c.classList.remove('paste-target'));
+            const cell = document.querySelector(`.grid-cell[data-step="${bgmState.pasteTargetStep}"][data-row="${bgmState.pasteTargetRow}"]`);
+            if (cell && bgmState.clipboard?.length) cell.classList.add('paste-target');
         };
         
         const processCell = (c, info) => {
@@ -1098,8 +1118,85 @@
         const undo = () => { if (bgmState.historyIndex <= 0) return; bgmState.historyIndex--; const s = bgmState.history[bgmState.historyIndex]; bgmState.melodyNotes = JSON.parse(JSON.stringify(s.melodyNotes)); bgmState.bassNotes = JSON.parse(JSON.stringify(s.bassNotes)); bgmState.drumNotes = JSON.parse(JSON.stringify(s.drumNotes)); clearSelection(); buildGrid(); };
         const redo = () => { if (bgmState.historyIndex >= bgmState.history.length - 1) return; bgmState.historyIndex++; const s = bgmState.history[bgmState.historyIndex]; bgmState.melodyNotes = JSON.parse(JSON.stringify(s.melodyNotes)); bgmState.bassNotes = JSON.parse(JSON.stringify(s.bassNotes)); bgmState.drumNotes = JSON.parse(JSON.stringify(s.drumNotes)); clearSelection(); buildGrid(); };
         
-        const copySelection = () => { if (!bgmState.selection.size) return; bgmState.clipboard = []; bgmState.clipboardTrack = bgmState.currentTrack; let min = Infinity; bgmState.selection.forEach(k => { const s = +k.split(':')[0]; if (s < min) min = s; }); bgmState.selection.forEach(k => { const [s, nd] = k.split(':'); bgmState.clipboard.push({ relativeStep: +s - min, noteOrDrum: nd }); }); showToast('コピーしました', 'success'); };
-        const pasteSelection = () => { if (!bgmState.clipboard?.length) return; if (bgmState.clipboardTrack !== bgmState.currentTrack) { showToast('同じトラックにのみペースト可'); return; } saveHistory(); let ps = 0; if (bgmState.selection.size) { let min = Infinity; bgmState.selection.forEach(k => { const s = +k.split(':')[0]; if (s < min) min = s; }); ps = min; } const total = bgmState.bars * 4 * SUBDIVISIONS; bgmState.clipboard.forEach(i => { const ts = ps + i.relativeStep; if (ts >= total) return; if (bgmState.currentTrack === 'drum') { if (!bgmState.drumNotes[ts]) bgmState.drumNotes[ts] = []; if (!bgmState.drumNotes[ts].includes(i.noteOrDrum)) bgmState.drumNotes[ts].push(i.noteOrDrum); } else { (bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes)[ts] = i.noteOrDrum; } }); buildGrid(); };
+        const copySelection = () => {
+            if (!bgmState.selection.size) return;
+            bgmState.clipboard = [];
+            bgmState.clipboardTrack = bgmState.currentTrack;
+            
+            // コピー元の最小step/rowを取得
+            let minStep = Infinity, minRow = Infinity;
+            bgmState.selection.forEach(k => {
+                const [s, nd] = k.split(':');
+                const step = +s;
+                if (step < minStep) minStep = step;
+                // rowを見つける
+                const cell = document.querySelector(`.grid-cell[data-step="${step}"][data-${bgmState.currentTrack === 'drum' ? 'drum' : 'note'}="${nd}"]`);
+                if (cell) {
+                    const row = +cell.dataset.row;
+                    if (row < minRow) minRow = row;
+                }
+            });
+            
+            bgmState.selection.forEach(k => {
+                const [s, nd] = k.split(':');
+                const step = +s;
+                const cell = document.querySelector(`.grid-cell[data-step="${step}"][data-${bgmState.currentTrack === 'drum' ? 'drum' : 'note'}="${nd}"]`);
+                if (cell) {
+                    const row = +cell.dataset.row;
+                    bgmState.clipboard.push({
+                        relativeStep: step - minStep,
+                        relativeRow: row - minRow,
+                        noteOrDrum: nd
+                    });
+                }
+            });
+            
+            showToast('コピーしました', 'success');
+            updatePasteTargetHighlight();
+        };
+        
+        const pasteSelection = () => {
+            if (!bgmState.clipboard?.length) {
+                showToast('コピーされたデータがありません');
+                return;
+            }
+            if (bgmState.clipboardTrack !== bgmState.currentTrack) {
+                showToast('同じトラックにのみペースト可');
+                return;
+            }
+            
+            saveHistory();
+            
+            const total = bgmState.bars * 4 * SUBDIVISIONS;
+            const allNotes = getAllNoteNames();
+            const baseStep = bgmState.pasteTargetStep;
+            const baseRow = bgmState.pasteTargetRow;
+            
+            bgmState.clipboard.forEach(item => {
+                const targetStep = baseStep + item.relativeStep;
+                const targetRow = baseRow + item.relativeRow;
+                
+                if (targetStep >= total || targetStep < 0) return;
+                
+                if (bgmState.currentTrack === 'drum') {
+                    if (targetRow < 0 || targetRow >= DRUM_NAMES.length) return;
+                    const drumName = DRUM_NAMES[targetRow];
+                    if (!bgmState.drumNotes[targetStep]) bgmState.drumNotes[targetStep] = [];
+                    if (!bgmState.drumNotes[targetStep].includes(drumName)) {
+                        bgmState.drumNotes[targetStep].push(drumName);
+                    }
+                } else {
+                    if (targetRow < 0 || targetRow >= allNotes.length) return;
+                    const noteName = allNotes[targetRow];
+                    const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes;
+                    notes[targetStep] = noteName;
+                }
+            });
+            
+            buildGrid();
+            showToast('ペーストしました', 'success');
+        };
+        
         const deleteSelection = () => { if (!bgmState.selection.size) return; saveHistory(); bgmState.selection.forEach(k => { const [s, nd] = k.split(':'); const step = +s; if (bgmState.currentTrack === 'drum') { if (bgmState.drumNotes[step]) { const idx = bgmState.drumNotes[step].indexOf(nd); if (idx >= 0) bgmState.drumNotes[step].splice(idx, 1); if (!bgmState.drumNotes[step].length) delete bgmState.drumNotes[step]; } } else { const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; if (notes[step] === nd) delete notes[step]; } }); clearSelection(); buildGrid(); };
         const transpose = sem => { saveHistory(); const notes = bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; const steps = bgmState.selection.size ? [...bgmState.selection].map(k => +k.split(':')[0]) : Object.keys(notes).map(Number); steps.forEach(step => { if (!notes[step]) return; const m = notes[step].match(/^([A-G]#?)(\d)$/); if (!m) return; let ni = NOTE_NAMES.indexOf(m[1]), oct = +m[2]; ni += sem; while (ni < 0) { ni += 12; oct--; } while (ni >= 12) { ni -= 12; oct++; } if (oct >= 2 && oct <= 6) notes[step] = NOTE_NAMES[ni] + oct; }); clearSelection(); buildGrid(); };
         const reverseTrack = () => { saveHistory(); const notes = bgmState.currentTrack === 'drum' ? bgmState.drumNotes : bgmState.currentTrack === 'melody' ? bgmState.melodyNotes : bgmState.bassNotes; const total = bgmState.bars * 4 * SUBDIVISIONS, rev = {}; Object.keys(notes).forEach(s => rev[total - 1 - +s] = notes[s]); if (bgmState.currentTrack === 'melody') bgmState.melodyNotes = rev; else if (bgmState.currentTrack === 'bass') bgmState.bassNotes = rev; else bgmState.drumNotes = rev; clearSelection(); buildGrid(); };
