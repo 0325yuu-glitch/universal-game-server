@@ -108,7 +108,11 @@ let cpuMode=true,cpuColor='black',cpuThinking=false;
 let animating=false;
 let myName='';
 let moveCount=0; // ターン数カウント
-let cpuCastled=false; // CPUがキャスリング済みかconst PIECE_VALUES={pawn:100,knight:320,bishop:330,rook:500,queen:900,king:20000};// 位置評価テーブル（黒視点で使用）
+let cpuCastled=false; // CPUがキャスリング済みか
+
+const PIECE_VALUES={pawn:100,knight:320,bishop:330,rook:500,queen:900,king:20000};
+
+// 位置評価テーブル（黒視点で使用）
 const PST_PAWN=[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0];
 const PST_KNIGHT=[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50];
 const PST_BISHOP=[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20];
@@ -116,7 +120,9 @@ const PST_ROOK=[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0
 const PST_QUEEN=[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20];
 const PST_KING_MID=[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20];
 // 終盤用キング評価（中央に近いほど高評価）
-const PST_KING_END=[-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50];// 黒番用定跡テーブル（白の初手に応じた応答）
+const PST_KING_END=[-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50];
+
+// 黒番用定跡テーブル（白の初手に応じた応答）
 const BLACK_OPENING_BOOK = {
   // 白がe4の場合
   'e2e4': [
@@ -138,7 +144,11 @@ const BLACK_OPENING_BOOK = {
     {from:{x:3,z:1}, to:{x:3,z:3}},  // d7-d5
     {from:{x:6,z:0}, to:{x:5,z:2}},  // Nf6
   ]
-};let lastWhiteMove = null; // 白の最後の手を記録function addChatMessage(text,type='system',sender=''){
+};
+
+let lastWhiteMove = null; // 白の最後の手を記録
+
+function addChatMessage(text,type='system',sender=''){
 const div=document.getElementById('chat-messages');
 const msg=document.createElement('div');
 msg.className='chat-msg '+type;
@@ -168,7 +178,7 @@ const gradient=ctx.createRadialGradient(256,256,0,256,256,400);
 gradient.addColorStop(0,'#4a3020');gradient.addColorStop(0.5,'#2a1810');gradient.addColorStop(1,'#0a0505');
 ctx.fillStyle=gradient;ctx.fillRect(0,0,512,512);
 ctx.strokeStyle='rgba(212,175,55,0.08)';ctx.lineWidth=2;
-for(let i=0;i<20;i++){ctx.beginPath();ctx.arc(256,256,50+i25,0,Math.PI2);ctx.stroke();}
+for(let i=0;i<20;i++){ctx.beginPath();ctx.arc(256,256,50+i*25,0,Math.PI*2);ctx.stroke();}
 scene.background=new THREE.CanvasTexture(bgCanvas);
 camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,1,1000);
 boardGroup=new THREE.Group();
@@ -200,7 +210,7 @@ const floorGrad=fctx.createRadialGradient(256,256,0,256,256,256);
 floorGrad.addColorStop(0,'#3d2515');floorGrad.addColorStop(0.7,'#2a1810');floorGrad.addColorStop(1,'#1a0f0a');
 fctx.fillStyle=floorGrad;fctx.fillRect(0,0,512,512);
 fctx.strokeStyle='rgba(212,175,55,0.2)';fctx.lineWidth=3;
-fctx.beginPath();fctx.arc(256,256,200,0,Math.PI2);fctx.stroke();
+fctx.beginPath();fctx.arc(256,256,200,0,Math.PI*2);fctx.stroke();
 const floor=new THREE.Mesh(floorGeo,new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(floorCanvas),metalness:0.1,roughness:0.9}));
 floor.rotation.x=-Math.PI/2;floor.position.y=-10;floor.receiveShadow=true;
 boardGroup.add(floor);
@@ -220,7 +230,7 @@ camera.aspect=a;
 camera.updateProjectionMatrix();
 const dist=isPortrait?230:195;
 const dir=myColor==='black'?-1:1;
-camera.position.set(0,dist0.6,dist0.6dir);
+camera.position.set(0,dist*0.6,dist*0.6*dir);
 camera.lookAt(0,0,0);
 boardGroup.position.y=isPortrait?-60:-50;
 }
@@ -237,7 +247,7 @@ for(let x=0;x<8;x++){board[x]=[];for(let z=0;z<8;z++){
 const isWhite=(x+z)%2===0;
 const mat=new THREE.MeshStandardMaterial({color:isWhite?WHITE_TILE:BLACK_TILE,metalness:0.05,roughness:0.9});
 const tile=new THREE.Mesh(tileGeo,mat);
-tile.position.set(xTILE-OFFSET,0.5,zTILE-OFFSET);tile.receiveShadow=true;
+tile.position.set(x*TILE-OFFSET,0.5,z*TILE-OFFSET);tile.receiveShadow=true;
 tile.userData={type:'tile',x,z,baseColor:mat.color.getHex()};
 boardGroup.add(tile);tiles.push(tile);board[x][z]=null;
 }}}
@@ -260,72 +270,72 @@ baseRing.rotation.x=Math.PI/2;baseRing.position.y=1.2;g.add(baseRing);
 const base2=new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.8,1,32),m);
 base2.position.y=1.7;g.add(base2);
 if(type==='pawn'){
-const bodyPts=[];for(let i=0;i<=20;i++){const t=i/20;bodyPts.push(new THREE.Vector2(2.5*(1-t0.7)Math.sin(Math.PIt0.9+0.2)+0.3,t5));}
+const bodyPts=[];for(let i=0;i<=20;i++){const t=i/20;bodyPts.push(new THREE.Vector2(2.5*(1-t*0.7)*Math.sin(Math.PI*t*0.9+0.2)+0.3,t*5));}
 const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
 const r=new THREE.Mesh(new THREE.TorusGeometry(1.8,0.15,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=5;g.add(r);
 const head=new THREE.Mesh(new THREE.SphereGeometry(1.8,32,32),m);head.position.y=7.5;g.add(head);
 const tip=new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16),accent);tip.position.y=9.2;g.add(tip);
 }
 if(type==='rook'){
-const bodyPts=[];for(let i=0;i<=15;i++){const t=i/15;bodyPts.push(new THREE.Vector2(2.8-t0.5,t5));}
+const bodyPts=[];for(let i=0;i<=15;i++){const t=i/15;bodyPts.push(new THREE.Vector2(2.8-t*0.5,t*5));}
 const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
 const r1=new THREE.Mesh(new THREE.TorusGeometry(2.5,0.15,12,32),accent);r1.rotation.x=Math.PI/2;r1.position.y=4;g.add(r1);
 const r2=new THREE.Mesh(new THREE.TorusGeometry(2.6,0.12,12,32),accent);r2.rotation.x=Math.PI/2;r2.position.y=7;g.add(r2);
 const top=new THREE.Mesh(new THREE.CylinderGeometry(3,2.5,1.5,32),m);top.position.y=8;g.add(top);
-for(let i=0;i<5;i++){const a=(Math.PI2/5)i;
-const merlon=new THREE.Mesh(new THREE.BoxGeometry(1.4,2,1.4),m);merlon.position.set(Math.cos(a)2.2,9.8,Math.sin(a)2.2);g.add(merlon);
-const cap=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.4,1.5),accent);cap.position.set(Math.cos(a)2.2,10.9,Math.sin(a)2.2);g.add(cap);
+for(let i=0;i<5;i++){const a=(Math.PI*2/5)*i;
+const merlon=new THREE.Mesh(new THREE.BoxGeometry(1.4,2,1.4),m);merlon.position.set(Math.cos(a)*2.2,9.8,Math.sin(a)*2.2);g.add(merlon);
+const cap=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.4,1.5),accent);cap.position.set(Math.cos(a)*2.2,10.9,Math.sin(a)*2.2);g.add(cap);
 }}
 if(type==='knight'){
 const S=0.75;
-const midPts=[];for(let i=0;i<=12;i++){const t=i/12;const r=(2.8-Math.sin(tMath.PI)1.0)S;midPts.push(new THREE.Vector2(r,t4S));}
+const midPts=[];for(let i=0;i<=12;i++){const t=i/12;const r=(2.8-Math.sin(t*Math.PI)*1.0)*S;midPts.push(new THREE.Vector2(r,t*4*S));}
 const mid=new THREE.Mesh(new THREE.LatheGeometry(midPts,32),m);mid.position.y=2.2;g.add(mid);
-const midRing=new THREE.Mesh(new THREE.TorusGeometry(2.2S,0.15S,12,32),accent);midRing.rotation.x=Math.PI/2;midRing.position.y=2.2+3S;g.add(midRing);
-const neck=new THREE.Mesh(new THREE.CylinderGeometry(1.0S,1.5S,3.5S,16),m);neck.position.set(0,2.2+4.5S,0.8S);neck.rotation.x=-0.4;g.add(neck);
-const head=new THREE.Mesh(new THREE.BoxGeometry(1.8S,2.5S,3.2S),m);head.position.set(0,2.2+6.5S,1.6S);head.rotation.x=-0.2;g.add(head);
-const topHead=new THREE.Mesh(new THREE.SphereGeometry(1.0S,16,16),m);topHead.position.set(0,2.2+7.8S,1.2S);topHead.scale.set(1,0.8,1);g.add(topHead);
-const snout=new THREE.Mesh(new THREE.BoxGeometry(1.2S,1.5S,2.0S),m);snout.position.set(0,2.2+5.5S,3.2S);snout.rotation.x=0.1;g.add(snout);
-const noseTip=new THREE.Mesh(new THREE.SphereGeometry(0.6S,12,12),m);noseTip.position.set(0,2.2+5.2S,4.2S);noseTip.scale.set(1,0.7,0.8);g.add(noseTip);
-const earGeo=new THREE.ConeGeometry(0.35S,1.0S,8);
-const ear1=new THREE.Mesh(earGeo,m);ear1.position.set(-0.6S,2.2+8.5S,0.8S);ear1.rotation.set(-0.3,0,-0.2);g.add(ear1);
-const ear2=new THREE.Mesh(earGeo,m);ear2.position.set(0.6S,2.2+8.5S,0.8S);ear2.rotation.set(-0.3,0,0.2);g.add(ear2);
-for(let i=0;i<5;i++){const t=i/4;const angle=-0.4+t0.5;const yPos=2.2+8S-t2.5S;const zPos=0.4S-t1.2S;
-const maneBase=new THREE.Mesh(new THREE.CylinderGeometry(0.12S,0.2S,1.2S,8),accent);maneBase.position.set(0,yPos,zPos);maneBase.rotation.x=angle;g.add(maneBase);
-const maneTip=new THREE.Mesh(new THREE.SphereGeometry(0.2S,8,8),accent);maneTip.position.set(0,yPos+Math.cos(angle)0.6S,zPos-Math.sin(angle)0.6S);g.add(maneTip);}
-const bridleV=new THREE.Mesh(new THREE.CylinderGeometry(0.06S,0.06S,2S,8),accent);bridleV.position.set(0,2.2+6S,2.8S);bridleV.rotation.x=0.1;g.add(bridleV);
-const bridleH=new THREE.Mesh(new THREE.TorusGeometry(1.0S,0.06S,8,16,Math.PI),accent);bridleH.position.set(0,2.2+7S,1.6S);bridleH.rotation.set(Math.PI/2,0,0);g.add(bridleH);
+const midRing=new THREE.Mesh(new THREE.TorusGeometry(2.2*S,0.15*S,12,32),accent);midRing.rotation.x=Math.PI/2;midRing.position.y=2.2+3*S;g.add(midRing);
+const neck=new THREE.Mesh(new THREE.CylinderGeometry(1.0*S,1.5*S,3.5*S,16),m);neck.position.set(0,2.2+4.5*S,0.8*S);neck.rotation.x=-0.4;g.add(neck);
+const head=new THREE.Mesh(new THREE.BoxGeometry(1.8*S,2.5*S,3.2*S),m);head.position.set(0,2.2+6.5*S,1.6*S);head.rotation.x=-0.2;g.add(head);
+const topHead=new THREE.Mesh(new THREE.SphereGeometry(1.0*S,16,16),m);topHead.position.set(0,2.2+7.8*S,1.2*S);topHead.scale.set(1,0.8,1);g.add(topHead);
+const snout=new THREE.Mesh(new THREE.BoxGeometry(1.2*S,1.5*S,2.0*S),m);snout.position.set(0,2.2+5.5*S,3.2*S);snout.rotation.x=0.1;g.add(snout);
+const noseTip=new THREE.Mesh(new THREE.SphereGeometry(0.6*S,12,12),m);noseTip.position.set(0,2.2+5.2*S,4.2*S);noseTip.scale.set(1,0.7,0.8);g.add(noseTip);
+const earGeo=new THREE.ConeGeometry(0.35*S,1.0*S,8);
+const ear1=new THREE.Mesh(earGeo,m);ear1.position.set(-0.6*S,2.2+8.5*S,0.8*S);ear1.rotation.set(-0.3,0,-0.2);g.add(ear1);
+const ear2=new THREE.Mesh(earGeo,m);ear2.position.set(0.6*S,2.2+8.5*S,0.8*S);ear2.rotation.set(-0.3,0,0.2);g.add(ear2);
+for(let i=0;i<5;i++){const t=i/4;const angle=-0.4+t*0.5;const yPos=2.2+8*S-t*2.5*S;const zPos=0.4*S-t*1.2*S;
+const maneBase=new THREE.Mesh(new THREE.CylinderGeometry(0.12*S,0.2*S,1.2*S,8),accent);maneBase.position.set(0,yPos,zPos);maneBase.rotation.x=angle;g.add(maneBase);
+const maneTip=new THREE.Mesh(new THREE.SphereGeometry(0.2*S,8,8),accent);maneTip.position.set(0,yPos+Math.cos(angle)*0.6*S,zPos-Math.sin(angle)*0.6*S);g.add(maneTip);}
+const bridleV=new THREE.Mesh(new THREE.CylinderGeometry(0.06*S,0.06*S,2*S,8),accent);bridleV.position.set(0,2.2+6*S,2.8*S);bridleV.rotation.x=0.1;g.add(bridleV);
+const bridleH=new THREE.Mesh(new THREE.TorusGeometry(1.0*S,0.06*S,8,16,Math.PI),accent);bridleH.position.set(0,2.2+7*S,1.6*S);bridleH.rotation.set(Math.PI/2,0,0);g.add(bridleH);
 const eyeMat=new THREE.MeshStandardMaterial({color:0x222222});
-const eye1=new THREE.Mesh(new THREE.SphereGeometry(0.15S,8,8),eyeMat);eye1.position.set(-0.8S,2.2+6.5S,2.4S);g.add(eye1);
-const eye2=new THREE.Mesh(new THREE.SphereGeometry(0.15S,8,8),eyeMat);eye2.position.set(0.8S,2.2+6.5S,2.4S);g.add(eye2);
+const eye1=new THREE.Mesh(new THREE.SphereGeometry(0.15*S,8,8),eyeMat);eye1.position.set(-0.8*S,2.2+6.5*S,2.4*S);g.add(eye1);
+const eye2=new THREE.Mesh(new THREE.SphereGeometry(0.15*S,8,8),eyeMat);eye2.position.set(0.8*S,2.2+6.5*S,2.4*S);g.add(eye2);
 if(color==='black')g.rotation.y=Math.PI;
 }
 if(type==='bishop'){
-const bodyPts=[];for(let i=0;i<=15;i++){const t=i/15;bodyPts.push(new THREE.Vector2(Math.max(0.4,2.6*(1-t0.55)Math.sin(Math.PIt0.85+0.25)+0.4),t6));}
+const bodyPts=[];for(let i=0;i<=15;i++){const t=i/15;bodyPts.push(new THREE.Vector2(Math.max(0.4,2.6*(1-t*0.55)*Math.sin(Math.PI*t*0.85+0.25)+0.4),t*6));}
 const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
 const r=new THREE.Mesh(new THREE.TorusGeometry(2.2,0.12,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4.5;g.add(r);
 const collar=new THREE.Mesh(new THREE.TorusGeometry(1.6,0.35,16,32),m);collar.rotation.x=Math.PI/2;collar.position.y=8;g.add(collar);
-const headPts=[];for(let i=0;i<=12;i++){const t=i/12;headPts.push(new THREE.Vector2(1.4(1-t)Math.sin(Math.PIt)+0.15,t4));}
+const headPts=[];for(let i=0;i<=12;i++){const t=i/12;headPts.push(new THREE.Vector2(1.4*(1-t)*Math.sin(Math.PI*t)+0.15,t*4));}
 const head=new THREE.Mesh(new THREE.LatheGeometry(headPts,32),m);head.position.y=8;g.add(head);
 const slit=new THREE.Mesh(new THREE.BoxGeometry(0.15,2,1.2),new THREE.MeshStandardMaterial({color:isWhite?0x222222:0x666666}));
 slit.position.set(0,10.5,0.3);g.add(slit);
 const tip=new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16),accent);tip.position.y=12.5;g.add(tip);
 }
 if(type==='queen'){
-const bodyPts=[];for(let i=0;i<=18;i++){const t=i/18;bodyPts.push(new THREE.Vector2(Math.max(0.6,2.8(1-t0.45)+Math.sin(tMath.PI2.5)0.25),t7));}
+const bodyPts=[];for(let i=0;i<=18;i++){const t=i/18;bodyPts.push(new THREE.Vector2(Math.max(0.6,2.8*(1-t*0.45)+Math.sin(t*Math.PI*2.5)*0.25),t*7));}
 const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
-for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(2.3-i0.25,0.12,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4+i1.5;g.add(r);}
+for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(2.3-i*0.25,0.12,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4+i*1.5;g.add(r);}
 const collar=new THREE.Mesh(new THREE.TorusGeometry(1.4,0.45,16,32),m);collar.rotation.x=Math.PI/2;collar.position.y=9;g.add(collar);
 const crown=new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.5,1.2,32),m);crown.position.y=9.8;g.add(crown);
 const crownRing=new THREE.Mesh(new THREE.TorusGeometry(1.9,0.1,12,32),accent);crownRing.rotation.x=Math.PI/2;crownRing.position.y=10.4;g.add(crownRing);
-for(let i=0;i<8;i++){const a=(Math.PI2/8)i;
-const spike=new THREE.Mesh(new THREE.ConeGeometry(0.3,2.2,8),m);spike.position.set(Math.cos(a)1.4,11.8,Math.sin(a)1.4);g.add(spike);
-const gem=new THREE.Mesh(new THREE.SphereGeometry(0.25,12,12),accent);gem.position.set(Math.cos(a)1.4,13,Math.sin(a)1.4);g.add(gem);}
+for(let i=0;i<8;i++){const a=(Math.PI*2/8)*i;
+const spike=new THREE.Mesh(new THREE.ConeGeometry(0.3,2.2,8),m);spike.position.set(Math.cos(a)*1.4,11.8,Math.sin(a)*1.4);g.add(spike);
+const gem=new THREE.Mesh(new THREE.SphereGeometry(0.25,12,12),accent);gem.position.set(Math.cos(a)*1.4,13,Math.sin(a)*1.4);g.add(gem);}
 const orb=new THREE.Mesh(new THREE.SphereGeometry(0.8,16,16),accent);orb.position.y=11;g.add(orb);
 }
 if(type==='king'){
-const bodyPts=[];for(let i=0;i<=18;i++){const t=i/18;bodyPts.push(new THREE.Vector2(Math.max(0.9,3(1-t0.4)),t7));}
+const bodyPts=[];for(let i=0;i<=18;i++){const t=i/18;bodyPts.push(new THREE.Vector2(Math.max(0.9,3*(1-t*0.4)),t*7));}
 const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
-for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(2.5-i0.3,0.15,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4+i1.8;g.add(r);}
+for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(2.5-i*0.3,0.15,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4+i*1.8;g.add(r);}
 const collar=new THREE.Mesh(new THREE.TorusGeometry(1.7,0.55,16,32),m);collar.rotation.x=Math.PI/2;collar.position.y=9.2;g.add(collar);
 const crown=new THREE.Mesh(new THREE.CylinderGeometry(2,1.8,1.5,32),m);crown.position.y=10.2;g.add(crown);
 const crownRing=new THREE.Mesh(new THREE.TorusGeometry(2.1,0.15,12,32),accent);crownRing.rotation.x=Math.PI/2;crownRing.position.y=11;g.add(crownRing);
@@ -336,21 +346,27 @@ const crossV=new THREE.Mesh(new THREE.BoxGeometry(0.5,2.8,0.5),accent);crossV.po
 const crossH=new THREE.Mesh(new THREE.BoxGeometry(2,0.5,0.5),accent);crossH.position.y=15.5;g.add(crossH);
 }
 g.traverse(c=>{if(c.isMesh){c.castShadow=true;c.receiveShadow=true;}});
-g.position.set(xTILE-OFFSET,0,zTILE-OFFSET);
+g.position.set(x*TILE-OFFSET,0,z*TILE-OFFSET);
 boardGroup.add(g);
 pieces.push(g);
 board[x][z]=g;
 return g;
-}function removePiece(p){
+}
+
+function removePiece(p){
 boardGroup.remove(p);
 const idx=pieces.indexOf(p);
 if(idx>=0)pieces.splice(idx,1);
 const{x,z}=p.userData;
 if(board[x]&&board[x][z]===p)board[x][z]=null;
-}function syncBoard(){
+}
+
+function syncBoard(){
 for(let x=0;x<8;x++)for(let z=0;z<8;z++){const p=board[x][z];if(p&&(p.userData.x!==x||p.userData.z!==z))board[x][z]=null;}
 for(const p of pieces){const{x,z}=p.userData;if(x>=0&&x<8&&z>=0&&z<8)board[x][z]=p;}
-}const inBounds=(x,z)=>x>=0&&x<8&&z>=0&&z<8;
+}
+
+const inBounds=(x,z)=>x>=0&&x<8&&z>=0&&z<8;
 function canAttackSquare(attacker,tx,tz,bd){
 const{pieceType:type,color,x,z}=attacker.userData;
 const dir=color==='white'?-1:1;
@@ -388,9 +404,9 @@ const moves=[],{pieceType:type,color,x,z,hasMoved}=piece.userData;
 const enemy=color==='white'?'black':'white',dir=color==='white'?-1:1;
 const isEmpty=(a,b)=>inBounds(a,b)&&!bd[a][b];
 const isEnemy=(a,b)=>inBounds(a,b)&&bd[a][b]&&bd[a][b].userData.color===enemy;
-const addSlide=(dx,dz,lim=8)=>{for(let i=1;i<=lim;i++){const nx=x+dxi,nz=z+dzi;if(!inBounds(nx,nz))break;if(isEmpty(nx,nz))moves.push({x:nx,z:nz,type:'move'});else{if(isEnemy(nx,nz))moves.push({x:nx,z:nz,type:'capture'});break;}}};
+const addSlide=(dx,dz,lim=8)=>{for(let i=1;i<=lim;i++){const nx=x+dx*i,nz=z+dz*i;if(!inBounds(nx,nz))break;if(isEmpty(nx,nz))moves.push({x:nx,z:nz,type:'move'});else{if(isEnemy(nx,nz))moves.push({x:nx,z:nz,type:'capture'});break;}}};
 if(type==='pawn'){
-if(isEmpty(x,z+dir)){moves.push({x,z:z+dir,type:'move'});if(!hasMoved&&isEmpty(x,z+dir2))moves.push({x,z:z+dir2,type:'move',double:true});}
+if(isEmpty(x,z+dir)){moves.push({x,z:z+dir,type:'move'});if(!hasMoved&&isEmpty(x,z+dir*2))moves.push({x,z:z+dir*2,type:'move',double:true});}
 [-1,1].forEach(ox=>{const nx=x+ox,nz=z+dir;if(isEnemy(nx,nz))moves.push({x:nx,z:nz,type:'capture'});if(enPassant&&enPassant.x===nx&&enPassant.z===nz)moves.push({x:nx,z:nz,type:'enpassant'});});
 }
 if(type==='rook'||type==='queen')[[0,1],[0,-1],[1,0],[-1,0]].forEach(d=>addSlide(d[0],d[1]));
@@ -428,7 +444,9 @@ if(canAttackSquare(p,king.userData.x,king.userData.z,tb)){safe=false;break;}
 piece.userData.x=sx;piece.userData.z=sz;
 return safe;
 });
-}// 終盤判定（駒の合計値で判定）
+}
+
+// 終盤判定（駒の合計値で判定）
 function isEndgame(){
   let totalMaterial = 0;
   for(const p of pieces){
@@ -437,22 +455,32 @@ function isEndgame(){
     }
   }
   return totalMaterial < 2600; // クイーン2体+ルーク1体未満なら終盤
-}// 動的な駒評価
+}
+
+// 動的な駒評価
 function evalPiece(p, bd){
   const {pieceType, color, x, z} = p.userData;
-  if(!bd[x] || bd[x][z] !== p) return 0;  let val = PIECE_VALUES[pieceType];
+  if(!bd[x] || bd[x][z] !== p) return 0;
+  
+  let val = PIECE_VALUES[pieceType];
   const idx = color === 'white' ? (7 - z) * 8 + x : z * 8 + x;
-  const endgame = isEndgame();  // PST適用
+  const endgame = isEndgame();
+  
+  // PST適用
   if(pieceType === 'pawn') val += PST_PAWN[idx];
   else if(pieceType === 'knight') val += PST_KNIGHT[idx];
   else if(pieceType === 'bishop') val += PST_BISHOP[idx];
   else if(pieceType === 'rook') val += PST_ROOK[idx];
   else if(pieceType === 'queen') val += PST_QUEEN[idx];
-  else if(pieceType === 'king') val += endgame ? PST_KING_END[idx] : PST_KING_MID[idx];  // ナイトの中央ボーナス（序盤・中盤）
+  else if(pieceType === 'king') val += endgame ? PST_KING_END[idx] : PST_KING_MID[idx];
+  
+  // ナイトの中央ボーナス（序盤・中盤）
   if(pieceType === 'knight' && !endgame){
     const centerDist = Math.abs(x - 3.5) + Math.abs(z - 3.5);
     val += (7 - centerDist) * 5;
-  }  // ビショップのオープン対角線ボーナス
+  }
+  
+  // ビショップのオープン対角線ボーナス
   if(pieceType === 'bishop'){
     let mobility = 0;
     [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dx,dz]) => {
@@ -464,15 +492,21 @@ function evalPiece(p, bd){
       }
     });
     val += mobility * 4;
-  }  // 終盤のポーン価値上昇
+  }
+  
+  // 終盤のポーン価値上昇
   if(pieceType === 'pawn' && endgame){
     val += 30;
     // プロモーションに近いほど価値上昇
     const promoRow = color === 'white' ? 0 : 7;
     const distToPromo = Math.abs(z - promoRow);
     val += (7 - distToPromo) * 15;
-  }  return val;
-}function evaluateBoard(col){
+  }
+  
+  return val;
+}
+
+function evaluateBoard(col){
   let score = 0;
   const bd = board;
   for(const p of pieces){
@@ -480,69 +514,116 @@ function evalPiece(p, bd){
     score += p.userData.color === col ? val : -val;
   }
   return score;
-}// チェックメイト判定
+}
+
+// チェックメイト判定
 function isCheckmate(color, bd){
   const king = pieces.find(p => p.userData.color === color && p.userData.pieceType === 'king');
   if(!king) return false;
   const enemy = color === 'white' ? 'black' : 'white';
-  if(!isSquareAttacked(king.userData.x, king.userData.z, enemy, bd)) return false;  for(const p of pieces){
+  if(!isSquareAttacked(king.userData.x, king.userData.z, enemy, bd)) return false;
+  
+  for(const p of pieces){
     if(p.userData.color !== color) continue;
     if(!bd[p.userData.x] || bd[p.userData.x][p.userData.z] !== p) continue;
     if(getLegalMoves(p, bd).length > 0) return false;
   }
   return true;
-}// 手を実行してチェックメイトになるか確認
+}
+
+// 手を実行してチェックメイトになるか確認
 function moveCausesCheckmate(p, m, bd){
   const enemy = p.userData.color === 'white' ? 'black' : 'white';
   const ox = p.userData.x, oz = p.userData.z;
-  const cap = bd[m.x][m.z];  bd[ox][oz] = null;
+  const cap = bd[m.x][m.z];
+  
+  bd[ox][oz] = null;
   bd[m.x][m.z] = p;
   p.userData.x = m.x;
-  p.userData.z = m.z;  const isMate = isCheckmate(enemy, bd);  p.userData.x = ox;
+  p.userData.z = m.z;
+  
+  const isMate = isCheckmate(enemy, bd);
+  
+  p.userData.x = ox;
   p.userData.z = oz;
   bd[ox][oz] = p;
-  bd[m.x][m.z] = cap;  return isMate;
-}// 王手をかけるかチェック
+  bd[m.x][m.z] = cap;
+  
+  return isMate;
+}
+
+// 王手をかけるかチェック
 function moveCausesCheck(p, m, bd){
   const enemy = p.userData.color === 'white' ? 'black' : 'white';
   const enemyKing = pieces.find(pk => pk.userData.color === enemy && pk.userData.pieceType === 'king');
-  if(!enemyKing) return false;  const ox = p.userData.x, oz = p.userData.z;
-  const cap = bd[m.x][m.z];  bd[ox][oz] = null;
+  if(!enemyKing) return false;
+  
+  const ox = p.userData.x, oz = p.userData.z;
+  const cap = bd[m.x][m.z];
+  
+  bd[ox][oz] = null;
   bd[m.x][m.z] = p;
   p.userData.x = m.x;
-  p.userData.z = m.z;  const givesCheck = isSquareAttacked(enemyKing.userData.x, enemyKing.userData.z, p.userData.color, bd);  p.userData.x = ox;
+  p.userData.z = m.z;
+  
+  const givesCheck = isSquareAttacked(enemyKing.userData.x, enemyKing.userData.z, p.userData.color, bd);
+  
+  p.userData.x = ox;
   p.userData.z = oz;
   bd[ox][oz] = p;
-  bd[m.x][m.z] = cap;  return givesCheck;
-}// 定跡手を取得
+  bd[m.x][m.z] = cap;
+  
+  return givesCheck;
+}
+
+// 定跡手を取得
 function getOpeningMove(){
   if(moveCount > 1) return null; // 最初の1手のみ
-  if(!lastWhiteMove) return null;  const key = lastWhiteMove;
+  if(!lastWhiteMove) return null;
+  
+  const key = lastWhiteMove;
   const responses = BLACK_OPENING_BOOK[key];
-  if(!responses) return null;  // 有効な定跡手を探す
+  if(!responses) return null;
+  
+  // 有効な定跡手を探す
   for(const resp of responses){
     const piece = board[resp.from.x][resp.from.z];
-    if(!piece || piece.userData.color !== 'black') continue;  }
+    if(!piece || piece.userData.color !== 'black') continue;
+    
+    const moves = getLegalMoves(piece);
+    const validMove = moves.find(m => m.x === resp.to.x && m.z === resp.to.z);
+    if(validMove) return {piece, move: validMove};
+  }
   return null;
-}function cpuMove(){
+}
+
+function cpuMove(){
 if(gameOver||cpuThinking||turn!==cpuColor||isOnline||animating)return;
-cpuThinking=true;setTimeout(()=>{
+cpuThinking=true;
+
+setTimeout(()=>{
 syncBoard();
 const enemy = cpuColor === 'white' ? 'black' : 'white';
 const endgame = isEndgame();
 const cpuKing = pieces.find(p => p.userData.color === cpuColor && p.userData.pieceType === 'king');
-const enemyKing = pieces.find(p => p.userData.color === enemy && p.userData.pieceType === 'king');// 定跡チェック（序盤のみ）
+const enemyKing = pieces.find(p => p.userData.color === enemy && p.userData.pieceType === 'king');
+
+// 定跡チェック（序盤のみ）
 const openingMove = getOpeningMove();
 if(openingMove){
   cpuThinking = false;
   doMove(openingMove.piece, openingMove.move, true, null);
   return;
-}// ミニマックス関数
+}
+
+// ミニマックス関数
 function minimax(depth, isMax, alpha, beta){
   if(depth === 0) return evaluateBoard(cpuColor);
   const col = isMax ? cpuColor : enemy;
   const movingPieces = pieces.filter(p => p.userData.color === col && board[p.userData.x] && board[p.userData.x][p.userData.z] === p);
-  let best = isMax ? -Infinity : Infinity;  for(const p of movingPieces){
+  let best = isMax ? -Infinity : Infinity;
+  
+  for(const p of movingPieces){
     const moves = getLegalMoves(p);
     for(const m of moves){
       const ox = p.userData.x, oz = p.userData.z;
@@ -550,59 +631,190 @@ function minimax(depth, isMax, alpha, beta){
       board[ox][oz] = null;
       board[m.x][m.z] = p;
       p.userData.x = m.x;
-      p.userData.z = m.z;  }
+      p.userData.z = m.z;
+      
+      const sc = minimax(depth - 1, !isMax, alpha, beta);
+      
+      p.userData.x = ox;
+      p.userData.z = oz;
+      board[ox][oz] = p;
+      board[m.x][m.z] = cap;
+      
+      if(isMax){
+        best = Math.max(best, sc);
+        alpha = Math.max(alpha, sc);
+      } else {
+        best = Math.min(best, sc);
+        beta = Math.min(beta, sc);
+      }
+      if(beta <= alpha) break;
+    }
+    if(beta <= alpha) break;
+  }
   return best;
-}const validPieces = pieces.filter(p => p.userData.color === cpuColor && board[p.userData.x] && board[p.userData.x][p.userData.z] === p);
+}
+
+const validPieces = pieces.filter(p => p.userData.color === cpuColor && board[p.userData.x] && board[p.userData.x][p.userData.z] === p);
 let bestMove = null, bestScore = -Infinity, bestPiece = null;
-let checkmateMove = null, checkmatePiece = null;// 全ての手を評価
+let checkmateMove = null, checkmatePiece = null;
+
+// 全ての手を評価
 for(const p of validPieces){
   const moves = getLegalMoves(p);
-  const pt = p.userData.pieceType;  for(const m of moves){
+  const pt = p.userData.pieceType;
+  
+  for(const m of moves){
     // チェックメイト判定（最優先）
     if(moveCausesCheckmate(p, m, board)){
       checkmateMove = m;
       checkmatePiece = p;
       break;
-    }  }  if(checkmateMove) break;
-}cpuThinking = false;// チェックメイト可能なら即実行
+    }
+    
+    const ox = p.userData.x, oz = p.userData.z;
+    const cap = board[m.x][m.z];
+    board[ox][oz] = null;
+    board[m.x][m.z] = p;
+    p.userData.x = m.x;
+    p.userData.z = m.z;
+    
+    let score = minimax(2, false, -Infinity, Infinity);
+    
+    // キャプチャボーナス
+    if(cap) score += PIECE_VALUES[cap.userData.pieceType] * 0.7;
+    
+    // プロモーションボーナス
+    if(pt === 'pawn' && (m.z === 0 || m.z === 7)) score += 900;
+    
+    // キャスリングボーナス（序盤）
+    if(m.type === 'castle'){
+      score += 80;
+      cpuCastled = true;
+    }
+    
+    // 序盤の原則（最初の10手）
+    if(moveCount < 20){
+      // ナイト・ビショップの展開ボーナス
+      if((pt === 'knight' || pt === 'bishop') && !p.userData.hasMoved){
+        score += 40;
+      }
+      // クイーンの早期展開ペナルティ
+      if(pt === 'queen' && moveCount < 10){
+        score -= 60;
+      }
+      // 中央支配ボーナス（d5, e5, d4, e4）
+      if((m.x === 3 || m.x === 4) && (m.z === 3 || m.z === 4)){
+        score += 25;
+      }
+      // キャスリング未完了ペナルティ（ターン10以降）
+      if(moveCount >= 10 && !cpuCastled && cpuKing && !cpuKing.userData.hasMoved){
+        if(m.type === 'castle') score += 100;
+      }
+    }
+    
+    // 王手ボーナス
+    board[ox][oz] = p;
+    board[m.x][m.z] = cap;
+    p.userData.x = ox;
+    p.userData.z = oz;
+    
+    if(moveCausesCheck(p, m, board)){
+      score += 30;
+    }
+    
+    // 終盤：敵キングを端に追い詰める
+    if(endgame && enemyKing){
+      const ekx = enemyKing.userData.x, ekz = enemyKing.userData.z;
+      // 敵キングが端に近いほど高評価
+      const edgeDist = Math.min(ekx, 7 - ekx, ekz, 7 - ekz);
+      score += (3 - edgeDist) * 20;
+      
+      // 自分の大駒を敵キングに近づける
+      if(pt === 'queen' || pt === 'rook'){
+        const distBefore = Math.abs(ox - ekx) + Math.abs(oz - ekz);
+        const distAfter = Math.abs(m.x - ekx) + Math.abs(m.z - ekz);
+        if(distAfter < distBefore) score += 25;
+      }
+      
+      // 自分のキングも参戦させる
+      if(pt === 'king'){
+        const distAfter = Math.abs(m.x - ekx) + Math.abs(m.z - ekz);
+        if(distAfter <= 3) score += 15;
+      }
+    }
+    
+    // 大駒の活用ボーナス（中盤以降）
+    if(moveCount >= 10){
+      if(pt === 'queen') score += 35;
+      if(pt === 'rook') score += 20;
+    }
+    
+    // ランダム要素（同評価の手をバラけさせる）
+    score += Math.random() * 5;
+    
+    if(score > bestScore){
+      bestScore = score;
+      bestMove = m;
+      bestPiece = p;
+    }
+  }
+  
+  if(checkmateMove) break;
+}
+
+cpuThinking = false;
+
+// チェックメイト可能なら即実行
 if(checkmateMove && checkmatePiece){
   const promo = (checkmatePiece.userData.pieceType === 'pawn' && (checkmateMove.z === 0 || checkmateMove.z === 7)) ? 'queen' : null;
   doMove(checkmatePiece, checkmateMove, true, promo);
   return;
-}if(bestMove && bestPiece){
+}
+
+if(bestMove && bestPiece){
   const promo = (bestPiece.userData.pieceType === 'pawn' && (bestMove.z === 0 || bestMove.z === 7)) ? 'queen' : null;
   doMove(bestPiece, bestMove, true, promo);
 }
 }, 500);
-}function animatePiece(piece,toX,toZ,callback,height=8){
+}
+
+function animatePiece(piece,toX,toZ,callback,height=8){
 const startPos=piece.position.clone();
-const endPos=new THREE.Vector3(toXTILE-OFFSET,0,toZTILE-OFFSET);
+const endPos=new THREE.Vector3(toX*TILE-OFFSET,0,toZ*TILE-OFFSET);
 const duration=400;
 const startTime=Date.now();
 animating=true;
 function update(){
 const elapsed=Date.now()-startTime;
 const t=Math.min(elapsed/duration,1);
-const easeT=t<0.5?2tt:1-Math.pow(-2*t+2,2)/2;
+const easeT=t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
 piece.position.x=startPos.x+(endPos.x-startPos.x)*easeT;
-piece.position.z=startPos.z+(endPos.z-startPos.z)easeT;
-piece.position.y=Math.sin(tMath.PI)*height;
+piece.position.z=startPos.z+(endPos.z-startPos.z)*easeT;
+piece.position.y=Math.sin(t*Math.PI)*height;
 if(t<1)requestAnimationFrame(update);
 else{piece.position.copy(endPos);animating=false;if(callback)callback();}
 }
 update();
-}// 白の手を記録するためのヘルパー
+}
+
+// 白の手を記録するためのヘルパー
 function recordWhiteMove(fromX, fromZ, toX, toZ){
   const files = 'abcdefgh';
   const ranks = '87654321';
   lastWhiteMove = files[fromX] + ranks[fromZ] + files[toX] + ranks[toZ];
-}function doMove(p,m,local=true,promo=null){
+}
+
+function doMove(p,m,local=true,promo=null){
 if(animating)return;
 const{color,x,z,pieceType}=p.userData;
-const fromX=x,fromZ=z;// 白の手を記録
+const fromX=x,fromZ=z;
+
+// 白の手を記録
 if(color === 'white'){
   recordWhiteMove(fromX, fromZ, m.x, m.z);
-}const needPromo=pieceType==='pawn'&&(m.z===0||m.z===7);
+}
+
+const needPromo=pieceType==='pawn'&&(m.z===0||m.z===7);
 const promoType=promo||'queen';
 if(local&&needPromo&&!promo&&color!==cpuColor){
 pendingPromo={p,m,fromX,fromZ};
@@ -615,8 +827,12 @@ let epCap=null;
 if(m.type==='enpassant'){const epZ=color==='white'?m.z+1:m.z-1;epCap=board[m.x][epZ];}
 board[fromX][fromZ]=null;
 p.userData.x=m.x;p.userData.z=m.z;p.userData.hasMoved=true;
-board[m.x][m.z]=p;// ターン数カウント
-moveCount++;const finishMove=()=>{
+board[m.x][m.z]=p;
+
+// ターン数カウント
+moveCount++;
+
+const finishMove=()=>{
 if(cap)removePiece(cap);
 if(epCap)removePiece(epCap);
 if(m.type==='castle'){
