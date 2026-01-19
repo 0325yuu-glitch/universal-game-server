@@ -107,46 +107,39 @@ let peer,conn,myColor=null,isOnline=false;
 let cpuMode=true,cpuColor='black',cpuThinking=false;
 let animating=false;
 let myName='';
-let moveCount=0; // ターン数カウント
-let cpuCastled=false; // CPUがキャスリング済みか
+let moveCount=0;
+let cpuCastled=false;
 
 const PIECE_VALUES={pawn:100,knight:320,bishop:330,rook:500,queen:900,king:20000};
 
-// 位置評価テーブル（黒視点で使用）
 const PST_PAWN=[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0];
 const PST_KNIGHT=[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50];
 const PST_BISHOP=[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20];
 const PST_ROOK=[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0];
 const PST_QUEEN=[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20];
 const PST_KING_MID=[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20];
-// 終盤用キング評価（中央に近いほど高評価）
 const PST_KING_END=[-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50];
 
-// 黒番用定跡テーブル（白の初手に応じた応答）
 const BLACK_OPENING_BOOK = {
-  // 白がe4の場合
   'e2e4': [
-    {from:{x:4,z:1}, to:{x:4,z:3}},  // e7-e5 (オープンゲーム)
-    {from:{x:2,z:1}, to:{x:2,z:3}},  // c7-c5 (シシリアン)
+    {from:{x:4,z:1}, to:{x:4,z:3}},
+    {from:{x:2,z:1}, to:{x:2,z:3}},
   ],
-  // 白がd4の場合
   'd2d4': [
-    {from:{x:3,z:1}, to:{x:3,z:3}},  // d7-d5
-    {from:{x:6,z:0}, to:{x:5,z:2}},  // Ng8-f6 (インディアン系)
+    {from:{x:3,z:1}, to:{x:3,z:3}},
+    {from:{x:6,z:0}, to:{x:5,z:2}},
   ],
-  // 白がc4の場合
   'c2c4': [
-    {from:{x:4,z:1}, to:{x:4,z:3}},  // e7-e5
-    {from:{x:2,z:1}, to:{x:2,z:3}},  // c7-c5
+    {from:{x:4,z:1}, to:{x:4,z:3}},
+    {from:{x:2,z:1}, to:{x:2,z:3}},
   ],
-  // 白がNf3の場合
   'g1f3': [
-    {from:{x:3,z:1}, to:{x:3,z:3}},  // d7-d5
-    {from:{x:6,z:0}, to:{x:5,z:2}},  // Nf6
+    {from:{x:3,z:1}, to:{x:3,z:3}},
+    {from:{x:6,z:0}, to:{x:5,z:2}},
   ]
 };
 
-let lastWhiteMove = null; // 白の最後の手を記録
+let lastWhiteMove = null;
 
 function addChatMessage(text,type='system',sender=''){
 const div=document.getElementById('chat-messages');
@@ -233,6 +226,12 @@ const dir=myColor==='black'?-1:1;
 camera.position.set(0,dist*0.6,dist*0.6*dir);
 camera.lookAt(0,0,0);
 boardGroup.position.y=isPortrait?-60:-50;
+// 盤面回転：黒プレイヤーは盤面を180度回転して自分の駒を手前に
+if(myColor==='black'){
+boardGroup.rotation.y=Math.PI;
+}else{
+boardGroup.rotation.y=0;
+}
 }
 function onResize(){renderer.setSize(innerWidth,innerHeight);updateCamera();}
 function createBoard(){
@@ -446,7 +445,6 @@ return safe;
 });
 }
 
-// 終盤判定（駒の合計値で判定）
 function isEndgame(){
   let totalMaterial = 0;
   for(const p of pieces){
@@ -454,10 +452,9 @@ function isEndgame(){
       totalMaterial += PIECE_VALUES[p.userData.pieceType];
     }
   }
-  return totalMaterial < 2600; // クイーン2体+ルーク1体未満なら終盤
+  return totalMaterial < 2600;
 }
 
-// 動的な駒評価
 function evalPiece(p, bd){
   const {pieceType, color, x, z} = p.userData;
   if(!bd[x] || bd[x][z] !== p) return 0;
@@ -466,7 +463,6 @@ function evalPiece(p, bd){
   const idx = color === 'white' ? (7 - z) * 8 + x : z * 8 + x;
   const endgame = isEndgame();
   
-  // PST適用
   if(pieceType === 'pawn') val += PST_PAWN[idx];
   else if(pieceType === 'knight') val += PST_KNIGHT[idx];
   else if(pieceType === 'bishop') val += PST_BISHOP[idx];
@@ -474,13 +470,11 @@ function evalPiece(p, bd){
   else if(pieceType === 'queen') val += PST_QUEEN[idx];
   else if(pieceType === 'king') val += endgame ? PST_KING_END[idx] : PST_KING_MID[idx];
   
-  // ナイトの中央ボーナス（序盤・中盤）
   if(pieceType === 'knight' && !endgame){
     const centerDist = Math.abs(x - 3.5) + Math.abs(z - 3.5);
     val += (7 - centerDist) * 5;
   }
   
-  // ビショップのオープン対角線ボーナス
   if(pieceType === 'bishop'){
     let mobility = 0;
     [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dx,dz]) => {
@@ -494,10 +488,8 @@ function evalPiece(p, bd){
     val += mobility * 4;
   }
   
-  // 終盤のポーン価値上昇
   if(pieceType === 'pawn' && endgame){
     val += 30;
-    // プロモーションに近いほど価値上昇
     const promoRow = color === 'white' ? 0 : 7;
     const distToPromo = Math.abs(z - promoRow);
     val += (7 - distToPromo) * 15;
@@ -516,7 +508,6 @@ function evaluateBoard(col){
   return score;
 }
 
-// チェックメイト判定
 function isCheckmate(color, bd){
   const king = pieces.find(p => p.userData.color === color && p.userData.pieceType === 'king');
   if(!king) return false;
@@ -531,7 +522,6 @@ function isCheckmate(color, bd){
   return true;
 }
 
-// 手を実行してチェックメイトになるか確認
 function moveCausesCheckmate(p, m, bd){
   const enemy = p.userData.color === 'white' ? 'black' : 'white';
   const ox = p.userData.x, oz = p.userData.z;
@@ -552,7 +542,6 @@ function moveCausesCheckmate(p, m, bd){
   return isMate;
 }
 
-// 王手をかけるかチェック
 function moveCausesCheck(p, m, bd){
   const enemy = p.userData.color === 'white' ? 'black' : 'white';
   const enemyKing = pieces.find(pk => pk.userData.color === enemy && pk.userData.pieceType === 'king');
@@ -576,16 +565,14 @@ function moveCausesCheck(p, m, bd){
   return givesCheck;
 }
 
-// 定跡手を取得
 function getOpeningMove(){
-  if(moveCount > 1) return null; // 最初の1手のみ
+  if(moveCount > 1) return null;
   if(!lastWhiteMove) return null;
   
   const key = lastWhiteMove;
   const responses = BLACK_OPENING_BOOK[key];
   if(!responses) return null;
   
-  // 有効な定跡手を探す
   for(const resp of responses){
     const piece = board[resp.from.x][resp.from.z];
     if(!piece || piece.userData.color !== 'black') continue;
@@ -608,7 +595,6 @@ const endgame = isEndgame();
 const cpuKing = pieces.find(p => p.userData.color === cpuColor && p.userData.pieceType === 'king');
 const enemyKing = pieces.find(p => p.userData.color === enemy && p.userData.pieceType === 'king');
 
-// 定跡チェック（序盤のみ）
 const openingMove = getOpeningMove();
 if(openingMove){
   cpuThinking = false;
@@ -616,7 +602,6 @@ if(openingMove){
   return;
 }
 
-// ミニマックス関数
 function minimax(depth, isMax, alpha, beta){
   if(depth === 0) return evaluateBoard(cpuColor);
   const col = isMax ? cpuColor : enemy;
@@ -658,13 +643,11 @@ const validPieces = pieces.filter(p => p.userData.color === cpuColor && board[p.
 let bestMove = null, bestScore = -Infinity, bestPiece = null;
 let checkmateMove = null, checkmatePiece = null;
 
-// 全ての手を評価
 for(const p of validPieces){
   const moves = getLegalMoves(p);
   const pt = p.userData.pieceType;
   
   for(const m of moves){
-    // チェックメイト判定（最優先）
     if(moveCausesCheckmate(p, m, board)){
       checkmateMove = m;
       checkmatePiece = p;
@@ -680,39 +663,30 @@ for(const p of validPieces){
     
     let score = minimax(2, false, -Infinity, Infinity);
     
-    // キャプチャボーナス
     if(cap) score += PIECE_VALUES[cap.userData.pieceType] * 0.7;
     
-    // プロモーションボーナス
     if(pt === 'pawn' && (m.z === 0 || m.z === 7)) score += 900;
     
-    // キャスリングボーナス（序盤）
     if(m.type === 'castle'){
       score += 80;
       cpuCastled = true;
     }
     
-    // 序盤の原則（最初の10手）
     if(moveCount < 20){
-      // ナイト・ビショップの展開ボーナス
       if((pt === 'knight' || pt === 'bishop') && !p.userData.hasMoved){
         score += 40;
       }
-      // クイーンの早期展開ペナルティ
       if(pt === 'queen' && moveCount < 10){
         score -= 60;
       }
-      // 中央支配ボーナス（d5, e5, d4, e4）
       if((m.x === 3 || m.x === 4) && (m.z === 3 || m.z === 4)){
         score += 25;
       }
-      // キャスリング未完了ペナルティ（ターン10以降）
       if(moveCount >= 10 && !cpuCastled && cpuKing && !cpuKing.userData.hasMoved){
         if(m.type === 'castle') score += 100;
       }
     }
     
-    // 王手ボーナス
     board[ox][oz] = p;
     board[m.x][m.z] = cap;
     p.userData.x = ox;
@@ -722,34 +696,28 @@ for(const p of validPieces){
       score += 30;
     }
     
-    // 終盤：敵キングを端に追い詰める
     if(endgame && enemyKing){
       const ekx = enemyKing.userData.x, ekz = enemyKing.userData.z;
-      // 敵キングが端に近いほど高評価
       const edgeDist = Math.min(ekx, 7 - ekx, ekz, 7 - ekz);
       score += (3 - edgeDist) * 20;
       
-      // 自分の大駒を敵キングに近づける
       if(pt === 'queen' || pt === 'rook'){
         const distBefore = Math.abs(ox - ekx) + Math.abs(oz - ekz);
         const distAfter = Math.abs(m.x - ekx) + Math.abs(m.z - ekz);
         if(distAfter < distBefore) score += 25;
       }
       
-      // 自分のキングも参戦させる
       if(pt === 'king'){
         const distAfter = Math.abs(m.x - ekx) + Math.abs(m.z - ekz);
         if(distAfter <= 3) score += 15;
       }
     }
     
-    // 大駒の活用ボーナス（中盤以降）
     if(moveCount >= 10){
       if(pt === 'queen') score += 35;
       if(pt === 'rook') score += 20;
     }
     
-    // ランダム要素（同評価の手をバラけさせる）
     score += Math.random() * 5;
     
     if(score > bestScore){
@@ -764,7 +732,6 @@ for(const p of validPieces){
 
 cpuThinking = false;
 
-// チェックメイト可能なら即実行
 if(checkmateMove && checkmatePiece){
   const promo = (checkmatePiece.userData.pieceType === 'pawn' && (checkmateMove.z === 0 || checkmateMove.z === 7)) ? 'queen' : null;
   doMove(checkmatePiece, checkmateMove, true, promo);
@@ -797,7 +764,6 @@ else{piece.position.copy(endPos);animating=false;if(callback)callback();}
 update();
 }
 
-// 白の手を記録するためのヘルパー
 function recordWhiteMove(fromX, fromZ, toX, toZ){
   const files = 'abcdefgh';
   const ranks = '87654321';
@@ -809,7 +775,6 @@ if(animating)return;
 const{color,x,z,pieceType}=p.userData;
 const fromX=x,fromZ=z;
 
-// 白の手を記録
 if(color === 'white'){
   recordWhiteMove(fromX, fromZ, m.x, m.z);
 }
@@ -829,7 +794,6 @@ board[fromX][fromZ]=null;
 p.userData.x=m.x;p.userData.z=m.z;p.userData.hasMoved=true;
 board[m.x][m.z]=p;
 
-// ターン数カウント
 moveCount++;
 
 const finishMove=()=>{
