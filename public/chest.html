@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>3Dチェス オンライン</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a0f0a;font-family:'Georgia',serif;overflow:hidden;touch-action:none}
+#canvas-container{width:100vw;height:100vh;position:fixed;top:0;left:0}
+canvas{display:block}
+#ui{position:fixed;bottom:0;left:0;width:100%;pointer-events:none;z-index:10}
+#bottom-bar{background:linear-gradient(0deg,rgba(10,5,3,0.95),rgba(15,8,5,0.85));padding:8px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom));border-top:1px solid #8b6914;pointer-events:auto}
+#status-row{display:flex;align-items:center;justify-content:center;gap:10px;padding:4px 0;margin-bottom:6px}
+#turn-display{background:linear-gradient(145deg,#d4af37,#b8960c);color:#1a0a00;padding:3px 12px;border-radius:3px;font-weight:bold;font-size:11px}
+#turn-display.black{background:linear-gradient(145deg,#444,#222);color:#fff}
+#check-alert{color:#ff4444;font-weight:bold;display:none;font-size:11px;text-shadow:0 0 8px #ff0000}
+#player-info{color:#d4af37;font-size:10px}
+#chat-container{margin-bottom:6px}
+#chat-messages{height:54px;overflow-y:auto;background:rgba(0,0,0,0.5);border:1px solid #5a4510;border-radius:4px;padding:4px 6px;margin-bottom:4px;font-size:11px;line-height:1.5}
+#chat-messages::-webkit-scrollbar{width:3px}
+#chat-messages::-webkit-scrollbar-thumb{background:#8b6914;border-radius:2px}
+.chat-msg{margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat-msg.system{color:#777;font-style:italic}
+.chat-msg.me{color:#7df}
+.chat-msg.other{color:#fd7}
+.chat-msg span{font-weight:bold}
+#chat-input-row{display:flex;gap:4px}
+#chat-name{width:60px;padding:6px;background:rgba(30,18,10,0.9);border:1px solid #8b6914;color:#7df;border-radius:3px;font-size:10px;text-align:center}
+#chat-name::placeholder{color:#456}
+#chat-input{flex:1;padding:6px 8px;background:rgba(30,18,10,0.9);border:1px solid #8b6914;color:#d4af37;border-radius:3px;font-size:11px}
+#chat-input::placeholder{color:#6b5010}
+.control-row{display:flex;gap:4px;justify-content:center;align-items:center;flex-wrap:wrap}
+#room-input{flex:1;min-width:80px;padding:6px 8px;background:rgba(30,18,10,0.9);border:1px solid #8b6914;color:#d4af37;border-radius:3px;font-size:11px;text-align:center}
+#room-input::placeholder{color:#6b5010}
+.btn{padding:6px 10px;border:none;border-radius:3px;font-size:10px;font-weight:bold;cursor:pointer;transition:all 0.2s}
+.btn-gold{background:linear-gradient(145deg,#d4af37,#b8960c);color:#1a0a00}
+.btn-gold:hover{background:linear-gradient(145deg,#e5c560,#d4af37)}
+.btn-send{padding:6px 12px}
+#status{color:#777;font-size:9px;text-align:center;margin-top:4px}
+#cpu-status{color:#d4af37;font-size:9px;text-align:center;margin-top:2px}
+#promo-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(145deg,#2a1a10,#1a0a00);border:2px solid #d4af37;border-radius:10px;padding:15px;display:none;z-index:100;pointer-events:auto;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.8)}
+#promo-modal h3{color:#d4af37;margin-bottom:10px;font-size:13px}
+#promo-modal .pieces{display:flex;gap:6px;justify-content:center}
+#promo-modal button{width:50px;height:50px;font-size:24px;background:linear-gradient(145deg,#3a2a20,#2a1a10);border:2px solid #8b6914;border-radius:6px;cursor:pointer}
+#promo-modal button:hover{border-color:#d4af37;transform:scale(1.1)}
+#game-over{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(145deg,#2a1a10,#1a0a00);border:2px solid #d4af37;border-radius:12px;padding:20px;display:none;z-index:100;pointer-events:auto;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.8)}
+#game-over h2{color:#d4af37;font-size:20px;margin-bottom:6px}
+#game-over p{color:#aaa;margin-bottom:12px;font-size:12px}
+</style>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+</head>
+<body>
+<div id="canvas-container"></div>
+<div id="ui">
+<div id="bottom-bar">
+<div id="status-row">
+<div id="turn-display">白の番</div>
+<span id="check-alert">チェック!</span>
+<span id="player-info"></span>
+</div>
+<div id="chat-container">
+<div id="chat-messages"></div>
+<div id="chat-input-row">
+<input type="text" id="chat-name" placeholder="名前" maxlength="8">
+<input type="text" id="chat-input" placeholder="メッセージ..." maxlength="100">
+<button class="btn btn-gold btn-send" onclick="sendChat()">送信</button>
+</div>
+</div>
+<div class="control-row" id="conn-panel">
+<input type="text" id="room-input" placeholder="合言葉">
+<button class="btn btn-gold" onclick="hostGame()">部屋作成</button>
+<button class="btn btn-gold" onclick="joinGame()">参加</button>
+</div>
+<div id="status"></div>
+<div id="cpu-status"></div>
+</div>
+</div>
+<div id="promo-modal">
+<h3>プロモーション</h3>
+<div class="pieces">
+<button onclick="promote('queen')">♛</button>
+<button onclick="promote('rook')">♜</button>
+<button onclick="promote('bishop')">♝</button>
+<button onclick="promote('knight')">♞</button>
+</div>
+</div>
+<div id="game-over">
+<h2 id="winner-text"></h2>
+<p id="game-over-reason"></p>
+<button class="btn btn-gold" onclick="location.reload()">もう一度</button>
+</div>
+<script type="module">
+import*as THREE from'three';
+const TILE=10,OFFSET=35;
+const WHITE_TILE=0xf0d9b5,BLACK_TILE=0xb58863;
+const WHITE_PIECE=0xfffaf0,BLACK_PIECE=0x4a4a4a;
+const GOLD=0xd4af37;
+const SELECT_COLOR=0x44ff44,ATTACK_COLOR=0xff4444;
+let scene,camera,renderer,raycaster,mouse;
+let boardGroup;
+let board=[],pieces=[],tiles=[];
+let selected=null,validMoves=[],turn='white',gameOver=false;
+let enPassant=null,pendingPromo=null;
+let peer,conn,myColor=null,isOnline=false;
+let cpuMode=true,cpuColor='black',cpuThinking=false;
+let animating=false;
+let myName='';
+let moveCount=0; // ターン数カウント
+let cpuCastled=false; // CPUがキャスリング済みかconst PIECE_VALUES={pawn:100,knight:320,bishop:330,rook:500,queen:900,king:20000};// 位置評価テーブル（黒視点で使用）
+const PST_PAWN=[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0];
+const PST_KNIGHT=[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50];
+const PST_BISHOP=[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20];
+const PST_ROOK=[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0];
+const PST_QUEEN=[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20];
+const PST_KING_MID=[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20];
+// 終盤用キング評価（中央に近いほど高評価）
+const PST_KING_END=[-50,-40,-30,-20,-20,-30,-40,-50,-30,-20,-10,0,0,-10,-20,-30,-30,-10,20,30,30,20,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,30,40,40,30,-10,-30,-30,-10,20,30,30,20,-10,-30,-30,-30,0,0,0,0,-30,-30,-50,-30,-30,-30,-30,-30,-30,-50];// 黒番用定跡テーブル（白の初手に応じた応答）
+const BLACK_OPENING_BOOK = {
+  // 白がe4の場合
+  'e2e4': [
+    {from:{x:4,z:1}, to:{x:4,z:3}},  // e7-e5 (オープンゲーム)
+    {from:{x:2,z:1}, to:{x:2,z:3}},  // c7-c5 (シシリアン)
+  ],
+  // 白がd4の場合
+  'd2d4': [
+    {from:{x:3,z:1}, to:{x:3,z:3}},  // d7-d5
+    {from:{x:6,z:0}, to:{x:5,z:2}},  // Ng8-f6 (インディアン系)
+  ],
+  // 白がc4の場合
+  'c2c4': [
+    {from:{x:4,z:1}, to:{x:4,z:3}},  // e7-e5
+    {from:{x:2,z:1}, to:{x:2,z:3}},  // c7-c5
+  ],
+  // 白がNf3の場合
+  'g1f3': [
+    {from:{x:3,z:1}, to:{x:3,z:3}},  // d7-d5
+    {from:{x:6,z:0}, to:{x:5,z:2}},  // Nf6
+  ]
+};let lastWhiteMove = null; // 白の最後の手を記録function addChatMessage(text,type='system',sender=''){
+const div=document.getElementById('chat-messages');
+const msg=document.createElement('div');
+msg.className='chat-msg '+type;
+if(sender)msg.innerHTML='<span style="color:'+(type==='me'?'#7df':'#fd7')+'">'+sender+':</span> '+text;
+else msg.textContent=text;
+div.appendChild(msg);
+div.scrollTop=div.scrollHeight;
+}
+window.sendChat=function(){
+const nameInput=document.getElementById('chat-name');
+const input=document.getElementById('chat-input');
+const text=input.value.trim();
+if(!text)return;
+myName=nameInput.value.trim()||'名無し';
+nameInput.value=myName;
+if(isOnline&&conn&&conn.open)conn.send({type:'chat',text,name:myName});
+addChatMessage(text,'me',myName);
+input.value='';
+};
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.activeElement.id==='chat-input')window.sendChat();});
+function init(){
+scene=new THREE.Scene();
+const bgCanvas=document.createElement('canvas');
+bgCanvas.width=512;bgCanvas.height=512;
+const ctx=bgCanvas.getContext('2d');
+const gradient=ctx.createRadialGradient(256,256,0,256,256,400);
+gradient.addColorStop(0,'#4a3020');gradient.addColorStop(0.5,'#2a1810');gradient.addColorStop(1,'#0a0505');
+ctx.fillStyle=gradient;ctx.fillRect(0,0,512,512);
+ctx.strokeStyle='rgba(212,175,55,0.08)';ctx.lineWidth=2;
+for(let i=0;i<20;i++){ctx.beginPath();ctx.arc(256,256,50+i25,0,Math.PI2);ctx.stroke();}
+scene.background=new THREE.CanvasTexture(bgCanvas);
+camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,1,1000);
+boardGroup=new THREE.Group();
+scene.add(boardGroup);
+updateCamera();
+renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.0;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+const sun=new THREE.DirectionalLight(0xfff8e8,1.0);
+sun.position.set(40,80,40);sun.castShadow=true;
+sun.shadow.mapSize.set(4096,4096);
+sun.shadow.camera.left=-100;sun.shadow.camera.right=100;
+sun.shadow.camera.top=100;sun.shadow.camera.bottom=-100;
+sun.shadow.bias=-0.0005;sun.shadow.normalBias=0.02;
+scene.add(sun);
+scene.add(new THREE.DirectionalLight(0xffe4c4,0.5)).position.set(-30,40,-30);
+scene.add(new THREE.DirectionalLight(0xffffff,0.3)).position.set(0,30,-50);
+const floorGeo=new THREE.CircleGeometry(120,64);
+const floorCanvas=document.createElement('canvas');
+floorCanvas.width=512;floorCanvas.height=512;
+const fctx=floorCanvas.getContext('2d');
+const floorGrad=fctx.createRadialGradient(256,256,0,256,256,256);
+floorGrad.addColorStop(0,'#3d2515');floorGrad.addColorStop(0.7,'#2a1810');floorGrad.addColorStop(1,'#1a0f0a');
+fctx.fillStyle=floorGrad;fctx.fillRect(0,0,512,512);
+fctx.strokeStyle='rgba(212,175,55,0.2)';fctx.lineWidth=3;
+fctx.beginPath();fctx.arc(256,256,200,0,Math.PI2);fctx.stroke();
+const floor=new THREE.Mesh(floorGeo,new THREE.MeshStandardMaterial({map:new THREE.CanvasTexture(floorCanvas),metalness:0.1,roughness:0.9}));
+floor.rotation.x=-Math.PI/2;floor.position.y=-10;floor.receiveShadow=true;
+boardGroup.add(floor);
+createBoard();createPieces();
+raycaster=new THREE.Raycaster();mouse=new THREE.Vector2();
+renderer.domElement.addEventListener('pointerdown',onClick);
+window.addEventListener('resize',onResize);
+addChatMessage('CPU対戦中。合言葉で対人戦可能。');
+document.getElementById('cpu-status').textContent='CPU対戦中';
+animate();
+}
+function updateCamera(){
+const a=innerWidth/innerHeight;
+const isPortrait=a<1;
+camera.fov=isPortrait?44:36;
+camera.aspect=a;
+camera.updateProjectionMatrix();
+const dist=isPortrait?230:195;
+const dir=myColor==='black'?-1:1;
+camera.position.set(0,dist0.6,dist0.6dir);
+camera.lookAt(0,0,0);
+boardGroup.position.y=isPortrait?-60:-50;
+}
+function onResize(){renderer.setSize(innerWidth,innerHeight);updateCamera();}
+function createBoard(){
+const table=new THREE.Mesh(new THREE.CylinderGeometry(65,70,6,64),new THREE.MeshStandardMaterial({color:0x2a1810,metalness:0.2,roughness:0.8}));
+table.position.y=-6;table.receiveShadow=true;boardGroup.add(table);
+const frame=new THREE.Mesh(new THREE.BoxGeometry(86,3,86),new THREE.MeshStandardMaterial({color:0x3d2515,metalness:0.3,roughness:0.7}));
+frame.position.y=-1.5;frame.receiveShadow=true;boardGroup.add(frame);
+const trim=new THREE.Mesh(new THREE.BoxGeometry(88,0.5,88),new THREE.MeshStandardMaterial({color:GOLD,metalness:0.7,roughness:0.3}));
+trim.position.y=0;boardGroup.add(trim);
+const tileGeo=new THREE.BoxGeometry(TILE-0.3,0.8,TILE-0.3);
+for(let x=0;x<8;x++){board[x]=[];for(let z=0;z<8;z++){
+const isWhite=(x+z)%2===0;
+const mat=new THREE.MeshStandardMaterial({color:isWhite?WHITE_TILE:BLACK_TILE,metalness:0.05,roughness:0.9});
+const tile=new THREE.Mesh(tileGeo,mat);
+tile.position.set(xTILE-OFFSET,0.5,zTILE-OFFSET);tile.receiveShadow=true;
+tile.userData={type:'tile',x,z,baseColor:mat.color.getHex()};
+boardGroup.add(tile);tiles.push(tile);board[x][z]=null;
+}}}
+function createPieces(){
+const layout=['rook','knight','bishop','queen','king','bishop','knight','rook'];
+for(let i=0;i<8;i++){makePiece('pawn','white',i,6);makePiece('pawn','black',i,1);makePiece(layout[i],'white',i,7);makePiece(layout[i],'black',i,0);}
+}
+function makePiece(type,color,x,z){
+const isWhite=color==='white';
+const mainColor=isWhite?WHITE_PIECE:BLACK_PIECE;
+const m=new THREE.MeshStandardMaterial({color:mainColor,metalness:isWhite?0.1:0.5,roughness:isWhite?0.6:0.35});
+const gold=new THREE.MeshStandardMaterial({color:GOLD,metalness:0.8,roughness:0.2});
+const accent=isWhite?gold:new THREE.MeshStandardMaterial({color:0xc0c0c0,metalness:0.7,roughness:0.3});
+const g=new THREE.Group();
+g.userData={type:'piece',pieceType:type,color,x,z,hasMoved:false};
+const base1=new THREE.Mesh(new THREE.CylinderGeometry(3.8,4.2,1.2,32),m);
+base1.position.y=0.6;g.add(base1);
+const baseRing=new THREE.Mesh(new THREE.TorusGeometry(4,0.2,12,32),accent);
+baseRing.rotation.x=Math.PI/2;baseRing.position.y=1.2;g.add(baseRing);
+const base2=new THREE.Mesh(new THREE.CylinderGeometry(3.2,3.8,1,32),m);
+base2.position.y=1.7;g.add(base2);
+if(type==='pawn'){
+const bodyPts=[];for(let i=0;i<=20;i++){const t=i/20;bodyPts.push(new THREE.Vector2(2.5*(1-t0.7)Math.sin(Math.PIt0.9+0.2)+0.3,t5));}
+const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
+const r=new THREE.Mesh(new THREE.TorusGeometry(1.8,0.15,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=5;g.add(r);
+const head=new THREE.Mesh(new THREE.SphereGeometry(1.8,32,32),m);head.position.y=7.5;g.add(head);
+const tip=new THREE.Mesh(new THREE.SphereGeometry(0.3,16,16),accent);tip.position.y=9.2;g.add(tip);
+}
+if(type==='rook'){
+const bodyPts=[];for(let i=0;i<=15;i++){const t=i/15;bodyPts.push(new THREE.Vector2(2.8-t0.5,t5));}
+const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
+const r1=new THREE.Mesh(new THREE.TorusGeometry(2.5,0.15,12,32),accent);r1.rotation.x=Math.PI/2;r1.position.y=4;g.add(r1);
+const r2=new THREE.Mesh(new THREE.TorusGeometry(2.6,0.12,12,32),accent);r2.rotation.x=Math.PI/2;r2.position.y=7;g.add(r2);
+const top=new THREE.Mesh(new THREE.CylinderGeometry(3,2.5,1.5,32),m);top.position.y=8;g.add(top);
+for(let i=0;i<5;i++){const a=(Math.PI2/5)i;
+const merlon=new THREE.Mesh(new THREE.BoxGeometry(1.4,2,1.4),m);merlon.position.set(Math.cos(a)2.2,9.8,Math.sin(a)2.2);g.add(merlon);
+const cap=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.4,1.5),accent);cap.position.set(Math.cos(a)2.2,10.9,Math.sin(a)2.2);g.add(cap);
+}}
+if(type==='knight'){
+const S=0.75;
+const midPts=[];for(let i=0;i<=12;i++){const t=i/12;const r=(2.8-Math.sin(tMath.PI)1.0)S;midPts.push(new THREE.Vector2(r,t4S));}
+const mid=new THREE.Mesh(new THREE.LatheGeometry(midPts,32),m);mid.position.y=2.2;g.add(mid);
+const midRing=new THREE.Mesh(new THREE.TorusGeometry(2.2S,0.15S,12,32),accent);midRing.rotation.x=Math.PI/2;midRing.position.y=2.2+3S;g.add(midRing);
+const neck=new THREE.Mesh(new THREE.CylinderGeometry(1.0S,1.5S,3.5S,16),m);neck.position.set(0,2.2+4.5S,0.8S);neck.rotation.x=-0.4;g.add(neck);
+const head=new THREE.Mesh(new THREE.BoxGeometry(1.8S,2.5S,3.2S),m);head.position.set(0,2.2+6.5S,1.6S);head.rotation.x=-0.2;g.add(head);
+const topHead=new THREE.Mesh(new THREE.SphereGeometry(1.0S,16,16),m);topHead.position.set(0,2.2+7.8S,1.2S);topHead.scale.set(1,0.8,1);g.add(topHead);
+const snout=new THREE.Mesh(new THREE.BoxGeometry(1.2S,1.5S,2.0S),m);snout.position.set(0,2.2+5.5S,3.2S);snout.rotation.x=0.1;g.add(snout);
+const noseTip=new THREE.Mesh(new THREE.SphereGeometry(0.6S,12,12),m);noseTip.position.set(0,2.2+5.2S,4.2S);noseTip.scale.set(1,0.7,0.8);g.add(noseTip);
+const earGeo=new THREE.ConeGeometry(0.35S,1.0S,8);
+const ear1=new THREE.Mesh(earGeo,m);ear1.position.set(-0.6S,2.2+8.5S,0.8S);ear1.rotation.set(-0.3,0,-0.2);g.add(ear1);
+const ear2=new THREE.Mesh(earGeo,m);ear2.position.set(0.6S,2.2+8.5S,0.8S);ear2.rotation.set(-0.3,0,0.2);g.add(ear2);
+for(let i=0;i<5;i++){const t=i/4;const angle=-0.4+t0.5;const yPos=2.2+8S-t2.5S;const zPos=0.4S-t1.2S;
+const maneBase=new THREE.Mesh(new THREE.CylinderGeometry(0.12S,0.2S,1.2S,8),accent);maneBase.position.set(0,yPos,zPos);maneBase.rotation.x=angle;g.add(maneBase);
+const maneTip=new THREE.Mesh(new THREE.SphereGeometry(0.2S,8,8),accent);maneTip.position.set(0,yPos+Math.cos(angle)0.6S,zPos-Math.sin(angle)0.6S);g.add(maneTip);}
+const bridleV=new THREE.Mesh(new THREE.CylinderGeometry(0.06S,0.06S,2S,8),accent);bridleV.position.set(0,2.2+6S,2.8S);bridleV.rotation.x=0.1;g.add(bridleV);
+const bridleH=new THREE.Mesh(new THREE.TorusGeometry(1.0S,0.06S,8,16,Math.PI),accent);bridleH.position.set(0,2.2+7S,1.6S);bridleH.rotation.set(Math.PI/2,0,0);g.add(bridleH);
+const eyeMat=new THREE.MeshStandardMaterial({color:0x222222});
+const eye1=new THREE.Mesh(new THREE.SphereGeometry(0.15S,8,8),eyeMat);eye1.position.set(-0.8S,2.2+6.5S,2.4S);g.add(eye1);
+const eye2=new THREE.Mesh(new THREE.SphereGeometry(0.15S,8,8),eyeMat);eye2.position.set(0.8S,2.2+6.5S,2.4S);g.add(eye2);
+if(color==='black')g.rotation.y=Math.PI;
+}
+if(type==='bishop'){
+const bodyPts=[];for(let i=0;i<=15;i++){const t=i/15;bodyPts.push(new THREE.Vector2(Math.max(0.4,2.6*(1-t0.55)Math.sin(Math.PIt0.85+0.25)+0.4),t6));}
+const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
+const r=new THREE.Mesh(new THREE.TorusGeometry(2.2,0.12,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4.5;g.add(r);
+const collar=new THREE.Mesh(new THREE.TorusGeometry(1.6,0.35,16,32),m);collar.rotation.x=Math.PI/2;collar.position.y=8;g.add(collar);
+const headPts=[];for(let i=0;i<=12;i++){const t=i/12;headPts.push(new THREE.Vector2(1.4(1-t)Math.sin(Math.PIt)+0.15,t4));}
+const head=new THREE.Mesh(new THREE.LatheGeometry(headPts,32),m);head.position.y=8;g.add(head);
+const slit=new THREE.Mesh(new THREE.BoxGeometry(0.15,2,1.2),new THREE.MeshStandardMaterial({color:isWhite?0x222222:0x666666}));
+slit.position.set(0,10.5,0.3);g.add(slit);
+const tip=new THREE.Mesh(new THREE.SphereGeometry(0.5,16,16),accent);tip.position.y=12.5;g.add(tip);
+}
+if(type==='queen'){
+const bodyPts=[];for(let i=0;i<=18;i++){const t=i/18;bodyPts.push(new THREE.Vector2(Math.max(0.6,2.8(1-t0.45)+Math.sin(tMath.PI2.5)0.25),t7));}
+const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
+for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(2.3-i0.25,0.12,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4+i1.5;g.add(r);}
+const collar=new THREE.Mesh(new THREE.TorusGeometry(1.4,0.45,16,32),m);collar.rotation.x=Math.PI/2;collar.position.y=9;g.add(collar);
+const crown=new THREE.Mesh(new THREE.CylinderGeometry(1.8,1.5,1.2,32),m);crown.position.y=9.8;g.add(crown);
+const crownRing=new THREE.Mesh(new THREE.TorusGeometry(1.9,0.1,12,32),accent);crownRing.rotation.x=Math.PI/2;crownRing.position.y=10.4;g.add(crownRing);
+for(let i=0;i<8;i++){const a=(Math.PI2/8)i;
+const spike=new THREE.Mesh(new THREE.ConeGeometry(0.3,2.2,8),m);spike.position.set(Math.cos(a)1.4,11.8,Math.sin(a)1.4);g.add(spike);
+const gem=new THREE.Mesh(new THREE.SphereGeometry(0.25,12,12),accent);gem.position.set(Math.cos(a)1.4,13,Math.sin(a)1.4);g.add(gem);}
+const orb=new THREE.Mesh(new THREE.SphereGeometry(0.8,16,16),accent);orb.position.y=11;g.add(orb);
+}
+if(type==='king'){
+const bodyPts=[];for(let i=0;i<=18;i++){const t=i/18;bodyPts.push(new THREE.Vector2(Math.max(0.9,3(1-t0.4)),t7));}
+const body=new THREE.Mesh(new THREE.LatheGeometry(bodyPts,32),m);body.position.y=2.2;g.add(body);
+for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.TorusGeometry(2.5-i0.3,0.15,12,32),accent);r.rotation.x=Math.PI/2;r.position.y=4+i1.8;g.add(r);}
+const collar=new THREE.Mesh(new THREE.TorusGeometry(1.7,0.55,16,32),m);collar.rotation.x=Math.PI/2;collar.position.y=9.2;g.add(collar);
+const crown=new THREE.Mesh(new THREE.CylinderGeometry(2,1.8,1.5,32),m);crown.position.y=10.2;g.add(crown);
+const crownRing=new THREE.Mesh(new THREE.TorusGeometry(2.1,0.15,12,32),accent);crownRing.rotation.x=Math.PI/2;crownRing.position.y=11;g.add(crownRing);
+const arch1=new THREE.Mesh(new THREE.TorusGeometry(1.2,0.15,12,16,Math.PI),accent);arch1.position.set(0,11.5,0);g.add(arch1);
+const arch2=new THREE.Mesh(new THREE.TorusGeometry(1.2,0.15,12,16,Math.PI),accent);arch2.position.set(0,11.5,0);arch2.rotation.y=Math.PI/2;g.add(arch2);
+const orb=new THREE.Mesh(new THREE.SphereGeometry(0.6,16,16),accent);orb.position.y=13;g.add(orb);
+const crossV=new THREE.Mesh(new THREE.BoxGeometry(0.5,2.8,0.5),accent);crossV.position.y=14.8;g.add(crossV);
+const crossH=new THREE.Mesh(new THREE.BoxGeometry(2,0.5,0.5),accent);crossH.position.y=15.5;g.add(crossH);
+}
+g.traverse(c=>{if(c.isMesh){c.castShadow=true;c.receiveShadow=true;}});
+g.position.set(xTILE-OFFSET,0,zTILE-OFFSET);
+boardGroup.add(g);
+pieces.push(g);
+board[x][z]=g;
+return g;
+}function removePiece(p){
+boardGroup.remove(p);
+const idx=pieces.indexOf(p);
+if(idx>=0)pieces.splice(idx,1);
+const{x,z}=p.userData;
+if(board[x]&&board[x][z]===p)board[x][z]=null;
+}function syncBoard(){
+for(let x=0;x<8;x++)for(let z=0;z<8;z++){const p=board[x][z];if(p&&(p.userData.x!==x||p.userData.z!==z))board[x][z]=null;}
+for(const p of pieces){const{x,z}=p.userData;if(x>=0&&x<8&&z>=0&&z<8)board[x][z]=p;}
+}const inBounds=(x,z)=>x>=0&&x<8&&z>=0&&z<8;
+function canAttackSquare(attacker,tx,tz,bd){
+const{pieceType:type,color,x,z}=attacker.userData;
+const dir=color==='white'?-1:1;
+if(type==='pawn')return(tx===x-1||tx===x+1)&&tz===z+dir;
+if(type==='knight'){const dx=Math.abs(tx-x),dz=Math.abs(tz-z);return(dx===1&&dz===2)||(dx===2&&dz===1);}
+if(type==='king'){const dx=Math.abs(tx-x),dz=Math.abs(tz-z);return dx<=1&&dz<=1&&(dx+dz>0);}
+const dx=tx-x,dz=tz-z,adx=Math.abs(dx),adz=Math.abs(dz);
+if((type==='rook'||type==='queen')&&(dx===0||dz===0)){
+const sx=dx===0?0:(dx>0?1:-1),sz=dz===0?0:(dz>0?1:-1);
+let cx=x+sx,cz=z+sz;
+while(cx!==tx||cz!==tz){if(bd[cx][cz])return false;cx+=sx;cz+=sz;}
+return true;
+}
+if((type==='bishop'||type==='queen')&&adx===adz&&adx>0){
+const sx=dx>0?1:-1,sz=dz>0?1:-1;
+let cx=x+sx,cz=z+sz;
+while(cx!==tx||cz!==tz){if(bd[cx][cz])return false;cx+=sx;cz+=sz;}
+return true;
+}
+return false;
+}
+function isSquareAttacked(tx,tz,byColor,bd){
+bd=bd||board;
+for(const p of pieces){
+if(p.userData.color!==byColor)continue;
+const px=p.userData.x,pz=p.userData.z;
+if(!bd[px]||bd[px][pz]!==p)continue;
+if(canAttackSquare(p,tx,tz,bd))return true;
+}
+return false;
+}
+function getRawMoves(piece,bd){
+bd=bd||board;
+const moves=[],{pieceType:type,color,x,z,hasMoved}=piece.userData;
+const enemy=color==='white'?'black':'white',dir=color==='white'?-1:1;
+const isEmpty=(a,b)=>inBounds(a,b)&&!bd[a][b];
+const isEnemy=(a,b)=>inBounds(a,b)&&bd[a][b]&&bd[a][b].userData.color===enemy;
+const addSlide=(dx,dz,lim=8)=>{for(let i=1;i<=lim;i++){const nx=x+dxi,nz=z+dzi;if(!inBounds(nx,nz))break;if(isEmpty(nx,nz))moves.push({x:nx,z:nz,type:'move'});else{if(isEnemy(nx,nz))moves.push({x:nx,z:nz,type:'capture'});break;}}};
+if(type==='pawn'){
+if(isEmpty(x,z+dir)){moves.push({x,z:z+dir,type:'move'});if(!hasMoved&&isEmpty(x,z+dir2))moves.push({x,z:z+dir2,type:'move',double:true});}
+[-1,1].forEach(ox=>{const nx=x+ox,nz=z+dir;if(isEnemy(nx,nz))moves.push({x:nx,z:nz,type:'capture'});if(enPassant&&enPassant.x===nx&&enPassant.z===nz)moves.push({x:nx,z:nz,type:'enpassant'});});
+}
+if(type==='rook'||type==='queen')[[0,1],[0,-1],[1,0],[-1,0]].forEach(d=>addSlide(d[0],d[1]));
+if(type==='bishop'||type==='queen')[[1,1],[1,-1],[-1,1],[-1,-1]].forEach(d=>addSlide(d[0],d[1]));
+if(type==='knight')[[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]].forEach(d=>{const nx=x+d[0],nz=z+d[1];if(isEmpty(nx,nz))moves.push({x:nx,z:nz,type:'move'});else if(isEnemy(nx,nz))moves.push({x:nx,z:nz,type:'capture'});});
+if(type==='king'){
+[[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]].forEach(d=>addSlide(d[0],d[1],1));
+if(!hasMoved){const row=color==='white'?7:0;
+if(!bd[5][row]&&!bd[6][row]){const rook=bd[7][row];if(rook&&rook.userData.pieceType==='rook'&&!rook.userData.hasMoved&&!isSquareAttacked(4,row,enemy,bd)&&!isSquareAttacked(5,row,enemy,bd)&&!isSquareAttacked(6,row,enemy,bd))moves.push({x:6,z:row,type:'castle',rookFrom:7,rookTo:5});}
+if(!bd[1][row]&&!bd[2][row]&&!bd[3][row]){const rook=bd[0][row];if(rook&&rook.userData.pieceType==='rook'&&!rook.userData.hasMoved&&!isSquareAttacked(4,row,enemy,bd)&&!isSquareAttacked(3,row,enemy,bd)&&!isSquareAttacked(2,row,enemy,bd))moves.push({x:2,z:row,type:'castle',rookFrom:0,rookTo:3});}
+}}
+return moves;
+}
+function getLegalMoves(piece,bd){
+bd=bd||board;
+const{color,x,z}=piece.userData,enemy=color==='white'?'black':'white';
+return getRawMoves(piece,bd).filter(m=>{
+if(m.type==='castle'){const king=pieces.find(p=>p.userData.color===color&&p.userData.pieceType==='king');if(isSquareAttacked(king.userData.x,king.userData.z,enemy,bd))return false;}
+const tb=bd.map(r=>[...r]);
+let epCap=null;
+if(m.type==='enpassant'){const epZ=color==='white'?m.z+1:m.z-1;epCap=tb[m.x][epZ];tb[m.x][epZ]=null;}
+const cap=tb[m.x][m.z];
+tb[x][z]=null;tb[m.x][m.z]=piece;
+const sx=piece.userData.x,sz=piece.userData.z;
+piece.userData.x=m.x;piece.userData.z=m.z;
+const king=pieces.find(p=>p.userData.color===color&&p.userData.pieceType==='king');
+let safe=true;
+for(const p of pieces){
+if(p.userData.color!==enemy)continue;
+if(p===cap||p===epCap)continue;
+const px=p.userData.x,pz=p.userData.z;
+if(!tb[px]||tb[px][pz]!==p)continue;
+if(canAttackSquare(p,king.userData.x,king.userData.z,tb)){safe=false;break;}
+}
+piece.userData.x=sx;piece.userData.z=sz;
+return safe;
+});
+}// 終盤判定（駒の合計値で判定）
+function isEndgame(){
+  let totalMaterial = 0;
+  for(const p of pieces){
+    if(p.userData.pieceType !== 'king' && p.userData.pieceType !== 'pawn'){
+      totalMaterial += PIECE_VALUES[p.userData.pieceType];
+    }
+  }
+  return totalMaterial < 2600; // クイーン2体+ルーク1体未満なら終盤
+}// 動的な駒評価
+function evalPiece(p, bd){
+  const {pieceType, color, x, z} = p.userData;
+  if(!bd[x] || bd[x][z] !== p) return 0;  let val = PIECE_VALUES[pieceType];
+  const idx = color === 'white' ? (7 - z) * 8 + x : z * 8 + x;
+  const endgame = isEndgame();  // PST適用
+  if(pieceType === 'pawn') val += PST_PAWN[idx];
+  else if(pieceType === 'knight') val += PST_KNIGHT[idx];
+  else if(pieceType === 'bishop') val += PST_BISHOP[idx];
+  else if(pieceType === 'rook') val += PST_ROOK[idx];
+  else if(pieceType === 'queen') val += PST_QUEEN[idx];
+  else if(pieceType === 'king') val += endgame ? PST_KING_END[idx] : PST_KING_MID[idx];  // ナイトの中央ボーナス（序盤・中盤）
+  if(pieceType === 'knight' && !endgame){
+    const centerDist = Math.abs(x - 3.5) + Math.abs(z - 3.5);
+    val += (7 - centerDist) * 5;
+  }  // ビショップのオープン対角線ボーナス
+  if(pieceType === 'bishop'){
+    let mobility = 0;
+    [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([dx,dz]) => {
+      for(let i = 1; i < 8; i++){
+        const nx = x + dx * i, nz = z + dz * i;
+        if(!inBounds(nx, nz)) break;
+        if(bd[nx][nz]) break;
+        mobility++;
+      }
+    });
+    val += mobility * 4;
+  }  // 終盤のポーン価値上昇
+  if(pieceType === 'pawn' && endgame){
+    val += 30;
+    // プロモーションに近いほど価値上昇
+    const promoRow = color === 'white' ? 0 : 7;
+    const distToPromo = Math.abs(z - promoRow);
+    val += (7 - distToPromo) * 15;
+  }  return val;
+}function evaluateBoard(col){
+  let score = 0;
+  const bd = board;
+  for(const p of pieces){
+    const val = evalPiece(p, bd);
+    score += p.userData.color === col ? val : -val;
+  }
+  return score;
+}// チェックメイト判定
+function isCheckmate(color, bd){
+  const king = pieces.find(p => p.userData.color === color && p.userData.pieceType === 'king');
+  if(!king) return false;
+  const enemy = color === 'white' ? 'black' : 'white';
+  if(!isSquareAttacked(king.userData.x, king.userData.z, enemy, bd)) return false;  for(const p of pieces){
+    if(p.userData.color !== color) continue;
+    if(!bd[p.userData.x] || bd[p.userData.x][p.userData.z] !== p) continue;
+    if(getLegalMoves(p, bd).length > 0) return false;
+  }
+  return true;
+}// 手を実行してチェックメイトになるか確認
+function moveCausesCheckmate(p, m, bd){
+  const enemy = p.userData.color === 'white' ? 'black' : 'white';
+  const ox = p.userData.x, oz = p.userData.z;
+  const cap = bd[m.x][m.z];  bd[ox][oz] = null;
+  bd[m.x][m.z] = p;
+  p.userData.x = m.x;
+  p.userData.z = m.z;  const isMate = isCheckmate(enemy, bd);  p.userData.x = ox;
+  p.userData.z = oz;
+  bd[ox][oz] = p;
+  bd[m.x][m.z] = cap;  return isMate;
+}// 王手をかけるかチェック
+function moveCausesCheck(p, m, bd){
+  const enemy = p.userData.color === 'white' ? 'black' : 'white';
+  const enemyKing = pieces.find(pk => pk.userData.color === enemy && pk.userData.pieceType === 'king');
+  if(!enemyKing) return false;  const ox = p.userData.x, oz = p.userData.z;
+  const cap = bd[m.x][m.z];  bd[ox][oz] = null;
+  bd[m.x][m.z] = p;
+  p.userData.x = m.x;
+  p.userData.z = m.z;  const givesCheck = isSquareAttacked(enemyKing.userData.x, enemyKing.userData.z, p.userData.color, bd);  p.userData.x = ox;
+  p.userData.z = oz;
+  bd[ox][oz] = p;
+  bd[m.x][m.z] = cap;  return givesCheck;
+}// 定跡手を取得
+function getOpeningMove(){
+  if(moveCount > 1) return null; // 最初の1手のみ
+  if(!lastWhiteMove) return null;  const key = lastWhiteMove;
+  const responses = BLACK_OPENING_BOOK[key];
+  if(!responses) return null;  // 有効な定跡手を探す
+  for(const resp of responses){
+    const piece = board[resp.from.x][resp.from.z];
+    if(!piece || piece.userData.color !== 'black') continue;  }
+  return null;
+}function cpuMove(){
+if(gameOver||cpuThinking||turn!==cpuColor||isOnline||animating)return;
+cpuThinking=true;setTimeout(()=>{
+syncBoard();
+const enemy = cpuColor === 'white' ? 'black' : 'white';
+const endgame = isEndgame();
+const cpuKing = pieces.find(p => p.userData.color === cpuColor && p.userData.pieceType === 'king');
+const enemyKing = pieces.find(p => p.userData.color === enemy && p.userData.pieceType === 'king');// 定跡チェック（序盤のみ）
+const openingMove = getOpeningMove();
+if(openingMove){
+  cpuThinking = false;
+  doMove(openingMove.piece, openingMove.move, true, null);
+  return;
+}// ミニマックス関数
+function minimax(depth, isMax, alpha, beta){
+  if(depth === 0) return evaluateBoard(cpuColor);
+  const col = isMax ? cpuColor : enemy;
+  const movingPieces = pieces.filter(p => p.userData.color === col && board[p.userData.x] && board[p.userData.x][p.userData.z] === p);
+  let best = isMax ? -Infinity : Infinity;  for(const p of movingPieces){
+    const moves = getLegalMoves(p);
+    for(const m of moves){
+      const ox = p.userData.x, oz = p.userData.z;
+      const cap = board[m.x][m.z];
+      board[ox][oz] = null;
+      board[m.x][m.z] = p;
+      p.userData.x = m.x;
+      p.userData.z = m.z;  }
+  return best;
+}const validPieces = pieces.filter(p => p.userData.color === cpuColor && board[p.userData.x] && board[p.userData.x][p.userData.z] === p);
+let bestMove = null, bestScore = -Infinity, bestPiece = null;
+let checkmateMove = null, checkmatePiece = null;// 全ての手を評価
+for(const p of validPieces){
+  const moves = getLegalMoves(p);
+  const pt = p.userData.pieceType;  for(const m of moves){
+    // チェックメイト判定（最優先）
+    if(moveCausesCheckmate(p, m, board)){
+      checkmateMove = m;
+      checkmatePiece = p;
+      break;
+    }  }  if(checkmateMove) break;
+}cpuThinking = false;// チェックメイト可能なら即実行
+if(checkmateMove && checkmatePiece){
+  const promo = (checkmatePiece.userData.pieceType === 'pawn' && (checkmateMove.z === 0 || checkmateMove.z === 7)) ? 'queen' : null;
+  doMove(checkmatePiece, checkmateMove, true, promo);
+  return;
+}if(bestMove && bestPiece){
+  const promo = (bestPiece.userData.pieceType === 'pawn' && (bestMove.z === 0 || bestMove.z === 7)) ? 'queen' : null;
+  doMove(bestPiece, bestMove, true, promo);
+}
+}, 500);
+}function animatePiece(piece,toX,toZ,callback,height=8){
+const startPos=piece.position.clone();
+const endPos=new THREE.Vector3(toXTILE-OFFSET,0,toZTILE-OFFSET);
+const duration=400;
+const startTime=Date.now();
+animating=true;
+function update(){
+const elapsed=Date.now()-startTime;
+const t=Math.min(elapsed/duration,1);
+const easeT=t<0.5?2tt:1-Math.pow(-2*t+2,2)/2;
+piece.position.x=startPos.x+(endPos.x-startPos.x)*easeT;
+piece.position.z=startPos.z+(endPos.z-startPos.z)easeT;
+piece.position.y=Math.sin(tMath.PI)*height;
+if(t<1)requestAnimationFrame(update);
+else{piece.position.copy(endPos);animating=false;if(callback)callback();}
+}
+update();
+}// 白の手を記録するためのヘルパー
+function recordWhiteMove(fromX, fromZ, toX, toZ){
+  const files = 'abcdefgh';
+  const ranks = '87654321';
+  lastWhiteMove = files[fromX] + ranks[fromZ] + files[toX] + ranks[toZ];
+}function doMove(p,m,local=true,promo=null){
+if(animating)return;
+const{color,x,z,pieceType}=p.userData;
+const fromX=x,fromZ=z;// 白の手を記録
+if(color === 'white'){
+  recordWhiteMove(fromX, fromZ, m.x, m.z);
+}const needPromo=pieceType==='pawn'&&(m.z===0||m.z===7);
+const promoType=promo||'queen';
+if(local&&needPromo&&!promo&&color!==cpuColor){
+pendingPromo={p,m,fromX,fromZ};
+document.getElementById('promo-modal').style.display='block';
+return;
+}
+if(local&&isOnline&&color!==cpuColor)sendMove(fromX,fromZ,m,promo);
+let cap=board[m.x][m.z];
+let epCap=null;
+if(m.type==='enpassant'){const epZ=color==='white'?m.z+1:m.z-1;epCap=board[m.x][epZ];}
+board[fromX][fromZ]=null;
+p.userData.x=m.x;p.userData.z=m.z;p.userData.hasMoved=true;
+board[m.x][m.z]=p;// ターン数カウント
+moveCount++;const finishMove=()=>{
+if(cap)removePiece(cap);
+if(epCap)removePiece(epCap);
+if(m.type==='castle'){
+const rook=board[m.rookFrom][m.z];
+if(rook){
+board[m.rookFrom][m.z]=null;
+rook.userData.x=m.rookTo;rook.userData.hasMoved=true;
+board[m.rookTo][m.z]=rook;
+animatePiece(rook,m.rookTo,m.z,afterRook,3);
+}else afterRook();
+}else afterRook();
+};
+const afterRook=()=>{
+if(needPromo){
+board[m.x][m.z]=null;
+removePiece(p);
+const newPiece=makePiece(promoType,color,m.x,m.z);
+newPiece.userData.hasMoved=true;
+}
+enPassant=m.double?{x:m.x,z:m.z+(color==='white'?1:-1)}:null;
+clearHighlight();selected=null;validMoves=[];
+turn=turn==='white'?'black':'white';
+syncBoard();
+checkGameState();
+};
+animatePiece(p,m.x,m.z,finishMove,pieceType==='knight'?12:8);
+}
+window.promote=function(type){document.getElementById('promo-modal').style.display='none';if(pendingPromo){const{p,m,fromX,fromZ}=pendingPromo;if(isOnline)sendMove(fromX,fromZ,m,type);doMove(p,m,false,type);pendingPromo=null;}};
+function checkGameState(){
+const td=document.getElementById('turn-display');
+td.textContent=turn==='white'?'白の番':'黒の番';
+td.className=turn==='black'?'black':'';
+const king=pieces.find(p=>p.userData.color===turn&&p.userData.pieceType==='king');
+if(!king)return;
+const enemy=turn==='white'?'black':'white';
+const inCheck=isSquareAttacked(king.userData.x,king.userData.z,enemy);
+document.getElementById('check-alert').style.display=inCheck?'inline':'none';
+let hasMoves=false;
+for(const p of pieces){
+if(p.userData.color===turn){
+const px=p.userData.x,pz=p.userData.z;
+if(board[px]&&board[px][pz]===p&&getLegalMoves(p).length>0){hasMoves=true;break;}
+}
+}
+if(!hasMoves){
+gameOver=true;
+let msg,reason;
+if(inCheck){msg=turn==='white'?'黒の勝ち!':'白の勝ち!';reason='チェックメイト';}
+else{msg='引き分け';reason='ステイルメイト';}
+document.getElementById('winner-text').textContent=msg;
+document.getElementById('game-over-reason').textContent=reason;
+document.getElementById('game-over').style.display='block';
+addChatMessage(msg+' - '+reason,'system');
+}else if(cpuMode&&!isOnline&&turn===cpuColor)cpuMove();
+}
+function getPieceAtTile(tx,tz){return board[tx]&&board[tx][tz]?board[tx][tz]:null;}
+function onClick(e){
+if(gameOver||pendingPromo||cpuThinking||animating)return;
+if(isOnline&&turn!==myColor)return;
+if(!isOnline&&cpuMode&&turn===cpuColor)return;
+const rect=renderer.domElement.getBoundingClientRect();
+mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+raycaster.setFromCamera(mouse,camera);
+const hits=raycaster.intersectObjects(boardGroup.children,true);
+if(!hits.length){clearHighlight();selected=null;return;}
+let clickedTileX=-1,clickedTileZ=-1;
+for(const hit of hits){
+let obj=hit.object;
+while(obj.parent&&obj.parent!==boardGroup&&!obj.userData.type)obj=obj.parent;
+if(obj.userData.type==='tile'){clickedTileX=obj.userData.x;clickedTileZ=obj.userData.z;break;}
+if(obj.userData.type==='piece'){clickedTileX=obj.userData.x;clickedTileZ=obj.userData.z;break;}
+}
+if(clickedTileX<0)return;
+const pieceOnTile=getPieceAtTile(clickedTileX,clickedTileZ);
+if(selected){
+const move=validMoves.find(m=>m.x===clickedTileX&&m.z===clickedTileZ);
+if(move){doMove(selected,move);return;}
+}
+if(pieceOnTile&&pieceOnTile.userData.color===turn){
+clearHighlight();
+selected=pieceOnTile;
+validMoves=getLegalMoves(pieceOnTile);
+highlight(pieceOnTile.userData.x,pieceOnTile.userData.z,0x00ff00);
+validMoves.forEach(m=>highlight(m.x,m.z,m.type==='capture'||m.type==='enpassant'?ATTACK_COLOR:SELECT_COLOR));
+}else{clearHighlight();selected=null;validMoves=[];}
+}
+function highlight(x,z,c){const t=tiles.find(t=>t.userData.x===x&&t.userData.z===z);if(t)t.material.color.setHex(c);}
+function clearHighlight(){tiles.forEach(t=>t.material.color.setHex(t.userData.baseColor));}
+async function hashId(t){const d=new TextEncoder().encode(t);const h=await crypto.subtle.digest('SHA-256',d);return Array.from(new Uint8Array(h)).slice(0,8).map(b=>b.toString(16).padStart(2,'0')).join('');}
+window.hostGame=async function(){
+const raw=document.getElementById('room-input').value.trim();
+if(!raw){alert('合言葉を入力してください');return;}
+const id=await hashId(raw);
+peer=new Peer(id);
+peer.on('open',()=>{document.getElementById('status').textContent='待機中...';addChatMessage('部屋作成。相手待ち...');});
+peer.on('error',e=>{if(e.type==='unavailable-id')alert('その合言葉は使用中');else alert('エラー: '+e.type);});
+peer.on('connection',c=>{
+conn=c;isOnline=true;cpuMode=false;
+myColor=Math.random()<0.5?'white':'black';
+document.getElementById('player-info').textContent='あなた:'+(myColor==='white'?'白':'黒');
+document.getElementById('status').textContent='';
+document.getElementById('cpu-status').textContent='対人戦';
+document.getElementById('conn-panel').style.display='none';
+updateCamera();
+addChatMessage('対戦相手が接続！','system');
+setTimeout(()=>conn.send({type:'init',color:myColor==='white'?'black':'white'}),300);
+conn.on('data',onData);
+conn.on('close',()=>{if(!gameOver){document.getElementById('winner-text').textContent='切断';document.getElementById('game-over-reason').textContent='相手が切断';document.getElementById('game-over').style.display='block';gameOver=true;addChatMessage('相手が切断','system');}});
+});
+};
+window.joinGame=async function(){
+const raw=document.getElementById('room-input').value.trim();
+if(!raw){alert('合言葉を入力してください');return;}
+const id=await hashId(raw);
+peer=new Peer();
+peer.on('open',()=>{
+conn=peer.connect(id);
+conn.on('open',()=>{
+isOnline=true;cpuMode=false;
+document.getElementById('status').textContent='';
+document.getElementById('cpu-status').textContent='対人戦';
+document.getElementById('conn-panel').style.display='none';
+addChatMessage('接続成功！','system');
+conn.on('data',onData);
+conn.on('close',()=>{if(!gameOver){document.getElementById('winner-text').textContent='切断';document.getElementById('game-over-reason').textContent='相手が切断';document.getElementById('game-over').style.display='block';gameOver=true;addChatMessage('相手が切断','system');}});
+});
+conn.on('error',()=>alert('接続失敗'));
+});
+};
+function onData(d){
+if(d.type==='init'){myColor=d.color;document.getElementById('player-info').textContent='あなた:'+(myColor==='white'?'白':'黒');updateCamera();}
+else if(d.type==='move'){const p=board[d.fx][d.fz];if(p)doMove(p,{x:d.tx,z:d.tz,type:d.mt,rookFrom:d.rf,rookTo:d.rt,double:d.dbl},false,d.promo);}
+else if(d.type==='chat'){addChatMessage(d.text,'other',d.name||'相手');}
+}
+function sendMove(fx,fz,m,promo){if(conn&&conn.open)conn.send({type:'move',fx,fz,tx:m.x,tz:m.z,mt:m.type,rf:m.rookFrom,rt:m.rookTo,dbl:m.double,promo});}
+function animate(){requestAnimationFrame(animate);renderer.render(scene,camera);}
+init();
+</script>
+</body>
+</html>
